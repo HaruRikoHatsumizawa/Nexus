@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analytics Grãos - Multinacional</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background: #f4f7fc; min-height: 100vh; display: flex; justify-content: center; align-items: center; }
+        .container { background: white; border-radius: 20px; box-shadow: 0 20px 60px rgba(0,0,0,0.1); width: 95%; max-width: 1300px; min-height: 85vh; padding: 30px; position: relative; }
+        #tela-login { display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 70vh; }
+        #tela-login h1 { color: #1a3b5d; margin-bottom: 10px; }
+        #tela-login p { color: #7a8fa6; margin-bottom: 30px; }
+        #form-login { background: #f8faff; padding: 40px; border-radius: 16px; width: 100%; max-width: 380px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        #form-login label { display: block; margin-top: 15px; font-weight: 600; color: #1a3b5d; font-size: 14px; }
+        #form-login input { width: 100%; padding: 12px; margin-top: 5px; border: 1px solid #dce4ec; border-radius: 8px; font-size: 16px; transition: 0.2s; }
+        #form-login input:focus { border-color: #2a7de1; outline: none; box-shadow: 0 0 0 3px rgba(42,125,225,0.2); }
+        #form-login button { width: 100%; margin-top: 25px; padding: 14px; background: #1a3b5d; color: white; border: none; border-radius: 8px; font-size: 18px; font-weight: 600; cursor: pointer; transition: 0.2s; }
+        #form-login button:hover { background: #0f2a44; transform: scale(1.02); }
+        .erro-login { color: #d32f2f; margin-top: 15px; text-align: center; font-size: 14px; }
+        #dashboard { display: none; }
+        .topbar { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e9edf4; padding-bottom: 15px; margin-bottom: 25px; flex-wrap: wrap; }
+        .topbar h2 { color: #1a3b5d; }
+        .topbar span { color: #5b7a99; font-weight: 500; }
+        .topbar button { background: #e74c3c; color: white; border: none; padding: 8px 20px; border-radius: 30px; font-weight: 600; cursor: pointer; transition: 0.2s; }
+        .topbar button:hover { background: #c0392b; }
+        .abas { display: flex; gap: 5px; margin-bottom: 25px; border-bottom: 2px solid #e9edf4; }
+        .aba { padding: 12px 28px; background: transparent; border: none; font-weight: 600; color: #5b7a99; cursor: pointer; border-bottom: 3px solid transparent; transition: 0.2s; font-size: 16px; }
+        .aba.ativa { color: #1a3b5d; border-bottom-color: #2a7de1; }
+        .aba:hover { color: #1a3b5d; }
+        .conteudo-aba { display: none; animation: fadeIn 0.3s ease; }
+        .conteudo-aba.ativa { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .card-grafico { background: #fafcff; padding: 20px; border-radius: 16px; border: 1px solid #eef2f8; margin-bottom: 30px; }
+        .card-grafico h3 { margin-bottom: 15px; color: #1a3b5d; }
+        .grafico-wrapper { max-height: 350px; max-width: 100%; }
+        .tabela-dados { width: 100%; border-collapse: collapse; font-size: 14px; }
+        .tabela-dados th { background: #1a3b5d; color: white; padding: 12px; text-align: left; }
+        .tabela-dados td { padding: 10px 12px; border-bottom: 1px solid #eef2f8; }
+        .tabela-dados tr:hover { background: #f4f9ff; }
+        .chat-container { display: flex; flex-direction: column; height: 500px; border: 1px solid #eef2f8; border-radius: 16px; overflow: hidden; background: #fafcff; }
+        .chat-mensagens { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+        .mensagem { max-width: 80%; padding: 12px 18px; border-radius: 16px; line-height: 1.5; word-wrap: break-word; }
+        .mensagem.usuario { background: #1a3b5d; color: white; align-self: flex-end; border-bottom-right-radius: 4px; }
+        .mensagem.ia { background: #e9edf4; color: #1a1a1a; align-self: flex-start; border-bottom-left-radius: 4px; }
+        .chat-input-area { display: flex; padding: 15px; background: white; border-top: 1px solid #eef2f8; gap: 10px; }
+        .chat-input-area input { flex: 1; padding: 12px 18px; border: 1px solid #dce4ec; border-radius: 30px; font-size: 16px; }
+        .chat-input-area input:focus { outline: none; border-color: #2a7de1; }
+        .chat-input-area button { padding: 12px 30px; background: #2a7de1; color: white; border: none; border-radius: 30px; font-weight: 600; cursor: pointer; transition: 0.2s; }
+        .chat-input-area button:hover { background: #1a5cb5; }
+        .chat-input-area button:disabled { background: #a0b8d0; cursor: not-allowed; }
+        .loading { display: inline-block; width: 20px; height: 20px; border: 3px solid #e9edf4; border-radius: 50%; border-top-color: #1a3b5d; animation: spin 0.8s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @media (max-width: 700px) { .container { padding: 15px; } .abas { flex-wrap: wrap; } .aba { padding: 10px 15px; font-size: 14px; } .mensagem { max-width: 95%; } }
+    </style>
+</head>
+<body>
+<div class="container" id="app">
+    <div id="tela-login">
+        <h1>📊 Analytics Grãos</h1>
+        <p>Multinacional - Controle Financeiro</p>
+        <form id="form-login">
+            <label for="usuario">Usuário</label>
+            <input type="text" id="usuario" placeholder="admin" required>
+            <label for="senha">Senha</label>
+            <input type="password" id="senha" placeholder="****" required>
+            <button type="submit">🔐 Entrar</button>
+            <div id="erro-login" class="erro-login"></div>
+        </form>
+    </div>
+
+    <div id="dashboard">
+        <div class="topbar">
+            <h2>📈 Painel de Gastos</h2>
+            <div>
+                <span id="usuario-logado">Usuário</span>
+                <button onclick="fazerLogout()">Sair</button>
+            </div>
+        </div>
+
+        <div class="abas">
+            <button class="aba ativa" data-aba="aba1">💰 Maiores Gastos</button>
+            <button class="aba" data-aba="aba2">🤖 Perguntar à IA</button>
+        </div>
+
+        <div id="aba1" class="conteudo-aba ativa">
+            <div class="card-grafico">
+                <h3>Top 10 Categorias com Maiores Gastos</h3>
+                <div class="grafico-wrapper">
+                    <canvas id="graficoGastos"></canvas>
+                </div>
+            </div>
+            <div style="overflow-x: auto;">
+                <h3 style="color:#1a3b5d; margin-bottom: 10px;">📋 Últimas Transações</h3>
+                <table class="tabela-dados" id="tabela-transacoes">
+                    <thead>
+                        <tr><th>Data</th><th>Categoria</th><th>Valor (R$)</th><th>Filial</th></tr>
+                    </thead>
+                    <tbody id="corpo-tabela">
+                        <tr><td colspan="4" style="text-align:center;">Carregando...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="aba2" class="conteudo-aba">
+            <div class="chat-container">
+                <div class="chat-mensagens" id="chat-mensagens">
+                    <div class="mensagem ia">👋 Olá! Pergunte-me sobre os gastos, tendências ou categorias.</div>
+                </div>
+                <div class="chat-input-area">
+                    <input type="text" id="input-chat" placeholder="Ex: Qual foi o maior gasto?" />
+                    <button id="btn-enviar-chat">Enviar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let chartInstance = null;
+    const telaLogin = document.getElementById('tela-login');
+    const dashboard = document.getElementById('dashboard');
+    const formLogin = document.getElementById('form-login');
+    const erroLogin = document.getElementById('erro-login');
+    const usuarioLogado = document.getElementById('usuario-logado');
+    const corpoTabela = document.getElementById('corpo-tabela');
+    const chatMensagens = document.getElementById('chat-mensagens');
+    const inputChat = document.getElementById('input-chat');
+    const btnEnviarChat = document.getElementById('btn-enviar-chat');
+
+    // Controle de abas
+    document.querySelectorAll('.aba').forEach(aba => {
+        aba.addEventListener('click', function() {
+            document.querySelectorAll('.aba').forEach(a => a.classList.remove('ativa'));
+            this.classList.add('ativa');
+            const alvo = this.dataset.aba;
+            document.querySelectorAll('.conteudo-aba').forEach(c => c.classList.remove('ativa'));
+            document.getElementById(alvo).classList.add('ativa');
+            if (alvo === 'aba1' && chartInstance) {
+                setTimeout(() => chartInstance.resize(), 100);
+            }
+        });
+    });
+
+    // Função auxiliar para requisições
+    async function requisicao(url, metodo = 'GET', corpo = null) {
+        const options = { method: metodo, headers: { 'Content-Type': 'application/json' } };
+        if (corpo) options.body = JSON.stringify(corpo);
+        const resposta = await fetch(url, options);
+        const dados = await resposta.json();
+        if (resposta.status === 401) {
+            alert('Sessão expirada ou login em outro dispositivo. Faça login novamente.');
+            sessionStorage.clear();
+            window.location.reload();
+            return null;
+        }
+        return { status: resposta.status, dados };
+    }
+
+    // Login
+    formLogin.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        erroLogin.innerText = '';
+        const usuario = document.getElementById('usuario').value.trim();
+        const senha = document.getElementById('senha').value.trim();
+        if (!usuario || !senha) {
+            erroLogin.innerText = 'Preencha todos os campos.';
+            return;
+        }
+        try {
+            const resp = await fetch('/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ usuario, senha })
+            });
+            const dados = await resp.json();
+            if (resp.ok) {
+                telaLogin.style.display = 'none';
+                dashboard.style.display = 'block';
+                usuarioLogado.innerText = `👤 ${usuario}`;
+                carregarDashboard();
+            } else {
+                erroLogin.innerText = dados.erro || 'Credenciais inválidas.';
+            }
+        } catch (err) {
+            erroLogin.innerText = 'Erro de conexão com o servidor.';
+        }
+    });
+
+    // Logout
+    async function fazerLogout() {
+        await requisicao('/logout', 'POST');
+        sessionStorage.clear();
+        window.location.reload();
+    }
+
+    // Carregar dados do dashboard
+    async function carregarDashboard() {
+        const resultado = await requisicao('/api/dados');
+        if (!resultado || resultado.status !== 200) return;
+        const dados = resultado.dados;
+        const ctx = document.getElementById('graficoGastos').getContext('2d');
+        if (chartInstance) chartInstance.destroy();
+        chartInstance = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: dados.categorias,
+                datasets: [{
+                    label: 'Total Gasto (R$)',
+                    data: dados.valores,
+                    backgroundColor: 'rgba(26, 59, 93, 0.7)',
+                    borderColor: 'rgba(26, 59, 93, 1)',
+                    borderWidth: 1,
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: { legend: { display: false } },
+                scales: { y: { beginAtZero: true, ticks: { callback: (value) => 'R$ ' + value.toLocaleString('pt-BR') } } }
+            }
+        });
+        const tabela = dados.tabela || [];
+        if (tabela.length === 0) {
+            corpoTabela.innerHTML = '<tr><td colspan="4" style="text-align:center;">Nenhum dado encontrado.</td></tr>';
+            return;
+        }
+        corpoTabela.innerHTML = tabela.map(row => `
+            <tr>
+                <td>${row.Data || '-'}</td>
+                <td>${row.Categoria || '-'}</td>
+                <td>R$ ${(row['Valor (R$)'] || 0).toFixed(2).replace('.', ',')}</td>
+                <td>${row.Filial || '-'}</td>
+            </tr>
+        `).join('');
+    }
+
+    // Chat
+    btnEnviarChat.addEventListener('click', enviarMensagem);
+    inputChat.addEventListener('keypress', (e) => { if (e.key === 'Enter') enviarMensagem(); });
+
+    async function enviarMensagem() {
+        const pergunta = inputChat.value.trim();
+        if (!pergunta) return;
+        adicionarMensagem('usuario', pergunta);
+        inputChat.value = '';
+        btnEnviarChat.disabled = true;
+        btnEnviarChat.innerText = '...';
+        const idLoading = 'loading-' + Date.now();
+        adicionarMensagem('ia', `<span class="loading"></span> Processando...`, idLoading);
+        try {
+            const resultado = await requisicao('/api/chat', 'POST', { pergunta });
+            btnEnviarChat.disabled = false;
+            btnEnviarChat.innerText = 'Enviar';
+            const loadingEl = document.getElementById(idLoading);
+            if (loadingEl) loadingEl.remove();
+            if (resultado && resultado.status === 200) {
+                adicionarMensagem('ia', resultado.dados.resposta || 'Não consegui processar.');
+            } else {
+                adicionarMensagem('ia', '❌ Erro ao obter resposta da IA.');
+            }
+        } catch (err) {
+            btnEnviarChat.disabled = false;
+            btnEnviarChat.innerText = 'Enviar';
+            const loadingEl = document.getElementById(idLoading);
+            if (loadingEl) loadingEl.remove();
+            adicionarMensagem('ia', '❌ Erro de conexão.');
+        }
+    }
+
+    function adicionarMensagem(tipo, texto, id = null) {
+        const div = document.createElement('div');
+        div.className = `mensagem ${tipo}`;
+        if (id) div.id = id;
+        div.innerHTML = texto;
+        chatMensagens.appendChild(div);
+        chatMensagens.scrollTop = chatMensagens.scrollHeight;
+    }
+
+    // Verifica se já existe sessão ativa ao carregar a página
+    (async function verificarSessao() {
+        try {
+            const resultado = await requisicao('/api/dados');
+            if (resultado && resultado.status === 200) {
+                telaLogin.style.display = 'none';
+                dashboard.style.display = 'block';
+                usuarioLogado.innerText = '👤 Sessão Ativa';
+                carregarDashboard();
+            }
+        } catch (e) {}
+    })();
+</script>
+</body>
+</html>
