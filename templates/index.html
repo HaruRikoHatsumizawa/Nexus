@@ -1,297 +1,38 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Analytics Grãos - Multinacional</title>
+    <title>Nexus | Análise financeira e energia</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        body { background: #f4f7fc; min-height: 100vh; display: flex; justify-content: center; align-items: center; }
-        .container { background: white; border-radius: 20px; box-shadow: 0 20px 60px rgba(0,0,0,0.1); width: 95%; max-width: 1300px; min-height: 85vh; padding: 30px; position: relative; }
-        #tela-login { display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 70vh; }
-        #tela-login h1 { color: #1a3b5d; margin-bottom: 10px; }
-        #tela-login p { color: #7a8fa6; margin-bottom: 30px; }
-        #form-login { background: #f8faff; padding: 40px; border-radius: 16px; width: 100%; max-width: 380px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
-        #form-login label { display: block; margin-top: 15px; font-weight: 600; color: #1a3b5d; font-size: 14px; }
-        #form-login input { width: 100%; padding: 12px; margin-top: 5px; border: 1px solid #dce4ec; border-radius: 8px; font-size: 16px; transition: 0.2s; }
-        #form-login input:focus { border-color: #2a7de1; outline: none; box-shadow: 0 0 0 3px rgba(42,125,225,0.2); }
-        #form-login button { width: 100%; margin-top: 25px; padding: 14px; background: #1a3b5d; color: white; border: none; border-radius: 8px; font-size: 18px; font-weight: 600; cursor: pointer; transition: 0.2s; }
-        #form-login button:hover { background: #0f2a44; transform: scale(1.02); }
-        .erro-login { color: #d32f2f; margin-top: 15px; text-align: center; font-size: 14px; }
-        #dashboard { display: none; }
-        .topbar { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e9edf4; padding-bottom: 15px; margin-bottom: 25px; flex-wrap: wrap; }
-        .topbar h2 { color: #1a3b5d; }
-        .topbar span { color: #5b7a99; font-weight: 500; }
-        .topbar button { background: #e74c3c; color: white; border: none; padding: 8px 20px; border-radius: 30px; font-weight: 600; cursor: pointer; transition: 0.2s; }
-        .topbar button:hover { background: #c0392b; }
-        .abas { display: flex; gap: 5px; margin-bottom: 25px; border-bottom: 2px solid #e9edf4; }
-        .aba { padding: 12px 28px; background: transparent; border: none; font-weight: 600; color: #5b7a99; cursor: pointer; border-bottom: 3px solid transparent; transition: 0.2s; font-size: 16px; }
-        .aba.ativa { color: #1a3b5d; border-bottom-color: #2a7de1; }
-        .aba:hover { color: #1a3b5d; }
-        .conteudo-aba { display: none; animation: fadeIn 0.3s ease; }
-        .conteudo-aba.ativa { display: block; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        .card-grafico { background: #fafcff; padding: 20px; border-radius: 16px; border: 1px solid #eef2f8; margin-bottom: 30px; }
-        .card-grafico h3 { margin-bottom: 15px; color: #1a3b5d; }
-        .grafico-wrapper { max-height: 350px; max-width: 100%; }
-        .tabela-dados { width: 100%; border-collapse: collapse; font-size: 14px; }
-        .tabela-dados th { background: #1a3b5d; color: white; padding: 12px; text-align: left; }
-        .tabela-dados td { padding: 10px 12px; border-bottom: 1px solid #eef2f8; }
-        .tabela-dados tr:hover { background: #f4f9ff; }
-        .chat-container { display: flex; flex-direction: column; height: 500px; border: 1px solid #eef2f8; border-radius: 16px; overflow: hidden; background: #fafcff; }
-        .chat-mensagens { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
-        .mensagem { max-width: 80%; padding: 12px 18px; border-radius: 16px; line-height: 1.5; word-wrap: break-word; }
-        .mensagem.usuario { background: #1a3b5d; color: white; align-self: flex-end; border-bottom-right-radius: 4px; }
-        .mensagem.ia { background: #e9edf4; color: #1a1a1a; align-self: flex-start; border-bottom-left-radius: 4px; }
-        .chat-input-area { display: flex; padding: 15px; background: white; border-top: 1px solid #eef2f8; gap: 10px; }
-        .chat-input-area input { flex: 1; padding: 12px 18px; border: 1px solid #dce4ec; border-radius: 30px; font-size: 16px; }
-        .chat-input-area input:focus { outline: none; border-color: #2a7de1; }
-        .chat-input-area button { padding: 12px 30px; background: #2a7de1; color: white; border: none; border-radius: 30px; font-weight: 600; cursor: pointer; transition: 0.2s; }
-        .chat-input-area button:hover { background: #1a5cb5; }
-        .chat-input-area button:disabled { background: #a0b8d0; cursor: not-allowed; }
-        .loading { display: inline-block; width: 20px; height: 20px; border: 3px solid #e9edf4; border-radius: 50%; border-top-color: #1a3b5d; animation: spin 0.8s linear infinite; }
-        @keyframes spin { to { transform: rotate(360deg); } }
-        @media (max-width: 700px) { .container { padding: 15px; } .abas { flex-wrap: wrap; } .aba { padding: 10px 15px; font-size: 14px; } .mensagem { max-width: 95%; } }
+        :root { --ink:#18211f; --muted:#66736f; --paper:#f4f0e8; --card:#fffdf8; --line:#ded8ca; --accent:#d96b3d; --green:#2e6b59; --yellow:#e8b94f; --blue:#4778a8; }
+        * { box-sizing:border-box; } body { margin:0; color:var(--ink); background:radial-gradient(circle at 90% 0%, #f6d7ad 0, transparent 28%), var(--paper); font-family:Georgia,'Times New Roman',serif; }
+        button,input { font:inherit; } .shell { width:min(1160px,calc(100% - 40px)); margin:auto; padding:28px 0 56px; }
+        header { display:flex; justify-content:space-between; align-items:center; padding:8px 0 55px; } .brand { display:flex; align-items:center; gap:11px; font:700 18px Arial,sans-serif; letter-spacing:.04em; } .brand-mark { width:28px; height:28px; background:var(--accent); color:#fff; display:grid; place-items:center; border-radius:50%; } .eyebrow { color:var(--accent); font:700 12px Arial,sans-serif; letter-spacing:.15em; text-transform:uppercase; }
+        h1 { max-width:780px; margin:13px 0 18px; font-size:clamp(42px,7vw,82px); line-height:.94; font-weight:400; letter-spacing:-.04em; } .intro { max-width:650px; color:var(--muted); font:17px/1.55 Arial,sans-serif; }
+        .tabs { display:flex; gap:8px; margin:38px 0 25px; border-bottom:1px solid var(--line); } .tab { border:0; background:transparent; color:var(--muted); padding:13px 18px; cursor:pointer; font:700 14px Arial,sans-serif; border-bottom:3px solid transparent; } .tab.active { color:var(--ink); border-bottom-color:var(--accent); } .tab-panel { display:none; } .tab-panel.active { display:block; animation:rise .35s ease-out; } @keyframes rise { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:none; } }
+        .upload-zone { margin:0 0 35px; padding:28px; background:var(--card); border:1px solid var(--line); border-radius:8px; display:flex; align-items:center; justify-content:space-between; gap:28px; } .upload-zone.dragging { border-color:var(--accent); background:#fff8ee; } .upload-copy h2 { margin:0 0 7px; font-size:25px; font-weight:400; } .upload-copy p { margin:0; color:var(--muted); font:14px/1.5 Arial,sans-serif; } .upload-button { background:var(--ink); color:#fff; padding:15px 20px; cursor:pointer; font:700 14px Arial,sans-serif; border-radius:4px; } #arquivo { display:none; } #status { color:var(--accent); font:700 13px Arial,sans-serif; min-height:18px; margin-top:10px; }
+        .result-head { display:flex; justify-content:space-between; align-items:end; gap:20px; margin-bottom:18px; } .result-head h2 { margin:5px 0 0; font-size:32px; font-weight:400; } .result-head p { margin:0; color:var(--muted); font:13px Arial,sans-serif; } .metrics { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:14px; } .metric,.panel { background:var(--card); border:1px solid var(--line); border-radius:6px; } .metric { padding:18px; min-height:112px; } .metric span { display:block; color:var(--muted); font:12px Arial,sans-serif; text-transform:uppercase; letter-spacing:.08em; } .metric strong { display:block; margin-top:18px; font-size:27px; font-weight:400; } .metric:first-child { background:var(--green); color:#fff; border-color:var(--green); } .metric:first-child span { color:#d7ebe3; }
+        .grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; } .panel { padding:23px; margin-top:14px; } .panel h3 { margin:0 0 18px; font-size:21px; font-weight:400; } .spotlight { display:flex; justify-content:space-between; align-items:end; gap:20px; border-top:1px solid var(--line); padding-top:16px; margin-top:14px; } .spotlight strong { color:var(--accent); font-size:32px; font-weight:400; white-space:nowrap; } .spotlight p { margin:0; color:var(--muted); font:13px/1.4 Arial,sans-serif; text-align:right; max-width:180px; } .bar-row { display:grid; grid-template-columns:minmax(85px,.8fr) 2fr auto; align-items:center; gap:10px; margin:13px 0; font:13px Arial,sans-serif; } .bar { height:8px; background:#ece7dc; border-radius:10px; overflow:hidden; } .bar i { display:block; height:100%; background:var(--accent); border-radius:10px; } .notice { padding:13px; background:#fff5d9; color:#765b17; font:13px/1.45 Arial,sans-serif; border-left:3px solid var(--yellow); }
+        .energy-intro { color:var(--muted); font:14px/1.5 Arial,sans-serif; max-width:700px; } .energy-metrics .metric:first-child { background:var(--blue); border-color:var(--blue); } .chart-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; } .chart-box { height:320px; position:relative; } .table-wrap { overflow:auto; } table { width:100%; border-collapse:collapse; min-width:650px; font:13px Arial,sans-serif; } th { text-align:left; color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.08em; padding:11px 10px; border-bottom:1px solid var(--line); } td { padding:13px 10px; border-bottom:1px solid #eee9df; } td:last-child { color:var(--blue); font-weight:700; } .empty { color:var(--muted); font:14px Arial,sans-serif; }
+        @media (max-width:700px) { .shell { width:min(100% - 28px,560px); padding-top:17px; } header { padding-bottom:40px; } h1 { font-size:50px; } .upload-zone,.result-head { align-items:flex-start; flex-direction:column; } .upload-button { width:100%; text-align:center; } .metrics { grid-template-columns:1fr 1fr; } .grid,.chart-grid { grid-template-columns:1fr; } .metric strong { font-size:22px; } }
     </style>
 </head>
-<body>
-<div class="container" id="app">
-    <div id="tela-login">
-        <h1>📊 Analytics Grãos</h1>
-        <p>Multinacional - Controle Financeiro</p>
-        <form id="form-login">
-            <label for="usuario">Usuário</label>
-            <input type="text" id="usuario" placeholder="admin" required>
-            <label for="senha">Senha</label>
-            <input type="password" id="senha" placeholder="****" required>
-            <button type="submit">🔐 Entrar</button>
-            <div id="erro-login" class="erro-login"></div>
-        </form>
-    </div>
-
-    <div id="dashboard">
-        <div class="topbar">
-            <h2>📈 Painel de Gastos</h2>
-            <div>
-                <span id="usuario-logado">Usuário</span>
-                <button onclick="fazerLogout()">Sair</button>
-            </div>
-        </div>
-
-        <div class="abas">
-            <button class="aba ativa" data-aba="aba1">💰 Maiores Gastos</button>
-            <button class="aba" data-aba="aba2">🤖 Perguntar à IA</button>
-        </div>
-
-        <div id="aba1" class="conteudo-aba ativa">
-            <div class="card-grafico">
-                <h3>Top 10 Categorias com Maiores Gastos</h3>
-                <div class="grafico-wrapper">
-                    <canvas id="graficoGastos"></canvas>
-                </div>
-            </div>
-            <div style="overflow-x: auto;">
-                <h3 style="color:#1a3b5d; margin-bottom: 10px;">📋 Últimas Transações</h3>
-                <table class="tabela-dados" id="tabela-transacoes">
-                    <thead>
-                        <tr><th>Data</th><th>Categoria</th><th>Valor (R$)</th><th>Filial</th></tr>
-                    </thead>
-                    <tbody id="corpo-tabela">
-                        <tr><td colspan="4" style="text-align:center;">Carregando...</td></tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        <div id="aba2" class="conteudo-aba">
-            <div class="chat-container">
-                <div class="chat-mensagens" id="chat-mensagens">
-                    <div class="mensagem ia">👋 Olá! Pergunte-me sobre os gastos, tendências ou categorias.</div>
-                </div>
-                <div class="chat-input-area">
-                    <input type="text" id="input-chat" placeholder="Ex: Qual foi o maior gasto?" />
-                    <button id="btn-enviar-chat">Enviar</button>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<script>
-    let chartInstance = null;
-    const telaLogin = document.getElementById('tela-login');
-    const dashboard = document.getElementById('dashboard');
-    const formLogin = document.getElementById('form-login');
-    const erroLogin = document.getElementById('erro-login');
-    const usuarioLogado = document.getElementById('usuario-logado');
-    const corpoTabela = document.getElementById('corpo-tabela');
-    const chatMensagens = document.getElementById('chat-mensagens');
-    const inputChat = document.getElementById('input-chat');
-    const btnEnviarChat = document.getElementById('btn-enviar-chat');
-
-    // Controle de abas
-    document.querySelectorAll('.aba').forEach(aba => {
-        aba.addEventListener('click', function() {
-            document.querySelectorAll('.aba').forEach(a => a.classList.remove('ativa'));
-            this.classList.add('ativa');
-            const alvo = this.dataset.aba;
-            document.querySelectorAll('.conteudo-aba').forEach(c => c.classList.remove('ativa'));
-            document.getElementById(alvo).classList.add('ativa');
-            if (alvo === 'aba1' && chartInstance) {
-                setTimeout(() => chartInstance.resize(), 100);
-            }
-        });
-    });
-
-    // Função auxiliar para requisições
-    async function requisicao(url, metodo = 'GET', corpo = null) {
-        const options = { method: metodo, headers: { 'Content-Type': 'application/json' } };
-        if (corpo) options.body = JSON.stringify(corpo);
-        const resposta = await fetch(url, options);
-        const dados = await resposta.json();
-        if (resposta.status === 401) {
-            alert('Sessão expirada ou login em outro dispositivo. Faça login novamente.');
-            sessionStorage.clear();
-            window.location.reload();
-            return null;
-        }
-        return { status: resposta.status, dados };
-    }
-
-    // Login
-    formLogin.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        erroLogin.innerText = '';
-        const usuario = document.getElementById('usuario').value.trim();
-        const senha = document.getElementById('senha').value.trim();
-        if (!usuario || !senha) {
-            erroLogin.innerText = 'Preencha todos os campos.';
-            return;
-        }
-        try {
-            const resp = await fetch('/login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ usuario, senha })
-            });
-            const dados = await resp.json();
-            if (resp.ok) {
-                telaLogin.style.display = 'none';
-                dashboard.style.display = 'block';
-                usuarioLogado.innerText = `👤 ${usuario}`;
-                carregarDashboard();
-            } else {
-                erroLogin.innerText = dados.erro || 'Credenciais inválidas.';
-            }
-        } catch (err) {
-            erroLogin.innerText = 'Erro de conexão com o servidor.';
-        }
-    });
-
-    // Logout
-    async function fazerLogout() {
-        await requisicao('/logout', 'POST');
-        sessionStorage.clear();
-        window.location.reload();
-    }
-
-    // Carregar dados do dashboard
-    async function carregarDashboard() {
-        const resultado = await requisicao('/api/dados');
-        if (!resultado || resultado.status !== 200) return;
-        const dados = resultado.dados;
-        const ctx = document.getElementById('graficoGastos').getContext('2d');
-        if (chartInstance) chartInstance.destroy();
-        chartInstance = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: dados.categorias,
-                datasets: [{
-                    label: 'Total Gasto (R$)',
-                    data: dados.valores,
-                    backgroundColor: 'rgba(26, 59, 93, 0.7)',
-                    borderColor: 'rgba(26, 59, 93, 1)',
-                    borderWidth: 1,
-                    borderRadius: 4
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: true,
-                plugins: { legend: { display: false } },
-                scales: { y: { beginAtZero: true, ticks: { callback: (value) => 'R$ ' + value.toLocaleString('pt-BR') } } }
-            }
-        });
-        const tabela = dados.tabela || [];
-        if (tabela.length === 0) {
-            corpoTabela.innerHTML = '<tr><td colspan="4" style="text-align:center;">Nenhum dado encontrado.</td></tr>';
-            return;
-        }
-        corpoTabela.innerHTML = tabela.map(row => `
-            <tr>
-                <td>${row.Data || '-'}</td>
-                <td>${row.Categoria || '-'}</td>
-                <td>R$ ${(row['Valor (R$)'] || 0).toFixed(2).replace('.', ',')}</td>
-                <td>${row.Filial || '-'}</td>
-            </tr>
-        `).join('');
-    }
-
-    // Chat
-    btnEnviarChat.addEventListener('click', enviarMensagem);
-    inputChat.addEventListener('keypress', (e) => { if (e.key === 'Enter') enviarMensagem(); });
-
-    async function enviarMensagem() {
-        const pergunta = inputChat.value.trim();
-        if (!pergunta) return;
-        adicionarMensagem('usuario', pergunta);
-        inputChat.value = '';
-        btnEnviarChat.disabled = true;
-        btnEnviarChat.innerText = '...';
-        const idLoading = 'loading-' + Date.now();
-        adicionarMensagem('ia', `<span class="loading"></span> Processando...`, idLoading);
-        try {
-            const resultado = await requisicao('/api/chat', 'POST', { pergunta });
-            btnEnviarChat.disabled = false;
-            btnEnviarChat.innerText = 'Enviar';
-            const loadingEl = document.getElementById(idLoading);
-            if (loadingEl) loadingEl.remove();
-            if (resultado && resultado.status === 200) {
-                adicionarMensagem('ia', resultado.dados.resposta || 'Não consegui processar.');
-            } else {
-                adicionarMensagem('ia', '❌ Erro ao obter resposta da IA.');
-            }
-        } catch (err) {
-            btnEnviarChat.disabled = false;
-            btnEnviarChat.innerText = 'Enviar';
-            const loadingEl = document.getElementById(idLoading);
-            if (loadingEl) loadingEl.remove();
-            adicionarMensagem('ia', '❌ Erro de conexão.');
-        }
-    }
-
-    function adicionarMensagem(tipo, texto, id = null) {
-        const div = document.createElement('div');
-        div.className = `mensagem ${tipo}`;
-        if (id) div.id = id;
-        div.innerHTML = texto;
-        chatMensagens.appendChild(div);
-        chatMensagens.scrollTop = chatMensagens.scrollHeight;
-    }
-
-    // Verifica se já existe sessão ativa ao carregar a página
-    (async function verificarSessao() {
-        try {
-            const resultado = await requisicao('/api/dados');
-            if (resultado && resultado.status === 200) {
-                telaLogin.style.display = 'none';
-                dashboard.style.display = 'block';
-                usuarioLogado.innerText = '👤 Sessão Ativa';
-                carregarDashboard();
-            }
-        } catch (e) {}
-    })();
-</script>
-</body>
-</html>
+<body><main class="shell">
+    <header><div class="brand"><span class="brand-mark">N</span> NEXUS</div><span class="eyebrow">Leitura financeira</span></header>
+    <section><div class="eyebrow">Seu resumo começa aqui</div><h1>Entenda para onde seu dinheiro está indo.</h1><p class="intro">Cruze suas planilhas com o consumo real de energia medido pelos seus dispositivos.</p></section>
+    <nav class="tabs"><button class="tab active" data-tab="financeiro">Resumo financeiro</button><button class="tab" data-tab="energia">Energia ESP32</button></nav>
+    <section class="tab-panel active" id="financeiro">
+        <div class="upload-zone" id="dropzone"><div class="upload-copy"><h2>Solte seu Excel aqui</h2><p>Formatos aceitos: .xlsx e .xls · todas as abas serão lidas</p><div id="status"></div></div><label class="upload-button" for="arquivo">Escolher planilha <input id="arquivo" type="file" accept=".xlsx,.xls"></label></div>
+        <div id="resultado" style="display:none"><div class="result-head"><div><div class="eyebrow">Resumo personalizado</div><h2>Sua leitura</h2></div><p id="info-arquivo"></p></div><div class="metrics"><div class="metric"><span>Total analisado</span><strong id="total"></strong></div><div class="metric"><span>Contas encontradas</span><strong id="quantidade"></strong></div><div class="metric"><span>Conta média</span><strong id="media"></strong></div><div class="metric"><span>Acima da média</span><strong id="acima"></strong></div></div><div class="grid"><article class="panel"><h3>Os extremos</h3><div class="spotlight"><div><div class="eyebrow">Mais cara</div><strong id="maior"></strong></div><p id="maior-detalhe"></p></div><div class="spotlight"><div><div class="eyebrow">Mais barata</div><strong id="menor"></strong></div><p id="menor-detalhe"></p></div></article><article class="panel"><h3>Onde pesa mais</h3><div id="grupos"></div><p class="empty" id="sem-grupos"></p></article></div><article class="panel"><h3>Fora do padrão</h3><div class="notice" id="aviso-padrao"></div><div class="table-wrap"><table><thead><tr><th>Aba</th><th>Identificação</th><th>Valor</th><th>Sinal</th></tr></thead><tbody id="tabela"></tbody></table></div></article></div>
++    </section>
++    <section class="tab-panel" id="energia"><div class="result-head"><div><div class="eyebrow">Telemetria do ESP32</div><h2>Consumo de energia</h2></div><button class="tab" id="atualizar-energia">Atualizar</button></div><p class="energy-intro">As leituras aparecem aqui quando o ESP32 enviar dados para <strong>/api/energia/leitura</strong>. O servidor mantém as últimas 500 leituras em memória.</p><div class="metrics energy-metrics"><div class="metric"><span>Energia medida</span><strong id="energia-total">0 kWh</strong></div><div class="metric"><span>Custo estimado</span><strong id="custo-total">R$ 0,00</strong></div><div class="metric"><span>Dispositivos</span><strong id="dispositivos-total">0</strong></div><div class="metric"><span>Leituras</span><strong id="leituras-total">0</strong></div></div><div class="chart-grid"><article class="panel"><h3>Energia por dispositivo</h3><div class="chart-box"><canvas id="grafico-energia"></canvas></div></article><article class="panel"><h3>Custo por dispositivo</h3><div class="chart-box"><canvas id="grafico-custo"></canvas></div></article></div><article class="panel"><h3>Leituras recentes</h3><div id="texto-energia" class="notice">Ainda não há leituras do ESP32.</div><div class="table-wrap"><table><thead><tr><th>Data</th><th>Dispositivo</th><th>Energia</th><th>Potência</th><th>Custo</th></tr></thead><tbody id="tabela-energia"><tr><td colspan="5" class="empty">Aguardando dados.</td></tr></tbody></table></div></article></section>
++</main>
++<script>
++const money=value=>Number(value||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'}); let energiaChart,custoChart;
++document.querySelectorAll('.tab[data-tab]').forEach(button=>button.addEventListener('click',()=>{document.querySelectorAll('.tab[data-tab]').forEach(item=>item.classList.remove('active'));document.querySelectorAll('.tab-panel').forEach(item=>item.classList.remove('active'));button.classList.add('active');document.getElementById(button.dataset.tab).classList.add('active');if(button.dataset.tab==='energia')carregarEnergia();}));
++const input=document.getElementById('arquivo'),dropzone=document.getElementById('dropzone'),status=document.getElementById('status'); const detail=row=>{const item=Object.entries(row).find(([key,value])=>key!=='_aba'&&value!==null&&value!=='');return item?`${item[0]}: ${item[1]}`:'Registro sem identificação';}; input.addEventListener('change',()=>input.files[0]&&enviar(input.files[0])); ['dragenter','dragover'].forEach(e=>dropzone.addEventListener(e,x=>{x.preventDefault();dropzone.classList.add('dragging');})); ['dragleave','drop'].forEach(e=>dropzone.addEventListener(e,x=>{x.preventDefault();dropzone.classList.remove('dragging');})); dropzone.addEventListener('drop',e=>e.dataTransfer.files[0]&&enviar(e.dataTransfer.files[0]));
++async function enviar(file){status.textContent=`Lendo ${file.name}...`;const form=new FormData();form.append('arquivo',file);try{const response=await fetch('/api/analisar',{method:'POST',body:form});const data=await response.json();if(!response.ok)throw new Error(data.erro);const m=data.metricas;document.getElementById('resultado').style.display='block';document.getElementById('info-arquivo').textContent=`${data.arquivo} · ${data.abas.length} abas`;document.getElementById('total').textContent=money(m.total);document.getElementById('quantidade').textContent=m.quantidade.toLocaleString('pt-BR');document.getElementById('media').textContent=money(m.media);document.getElementById('acima').textContent=`${m.acima_media} (${Math.round(m.acima_media/m.quantidade*100)}%)`;document.getElementById('maior').textContent=money(data.maior.valor);document.getElementById('maior-detalhe').textContent=detail(data.maior.dados);document.getElementById('menor').textContent=money(data.menor.valor);document.getElementById('menor-detalhe').textContent=detail(data.menor.dados);const max=data.grupos[0]?.total||1;document.getElementById('grupos').innerHTML=data.grupos.map(item=>`<div class="bar-row"><span>${item.nome}</span><div class="bar"><i style="width:${item.total/max*100}%"></i></div><b>${money(item.total)}</b></div>`).join('');document.getElementById('sem-grupos').textContent=data.grupos.length?'':'Não encontrei uma coluna de categoria.';document.getElementById('aviso-padrao').textContent=m.fora_padrao?`${m.fora_padrao} conta(s) destoam do conjunto pela regra do intervalo interquartil.`:'Nenhuma conta ficou fora do padrão.';document.getElementById('tabela').innerHTML=data.fora_padrao.length?data.fora_padrao.map(item=>`<tr><td>${item.dados._aba||'-'}</td><td>${detail(item.dados)}</td><td>${money(item.valor)}</td><td>${item.valor>m.media?'Muito acima':'Muito abaixo'}</td></tr>`).join(''):'<tr><td colspan="4" class="empty">Nenhum desvio relevante encontrado.</td></tr>';status.textContent='Leitura concluída.';}catch(error){status.textContent=error.message||'Não foi possível analisar a planilha.';}}
++document.getElementById('atualizar-energia').addEventListener('click',carregarEnergia); async function carregarEnergia(){try{const data=await (await fetch('/api/energia')).json();document.getElementById('energia-total').textContent=`${data.resumo.energia_kwh.toLocaleString('pt-BR',{maximumFractionDigits:3})} kWh`;document.getElementById('custo-total').textContent=money(data.resumo.custo_brl);document.getElementById('dispositivos-total').textContent=data.resumo.dispositivos;document.getElementById('leituras-total').textContent=data.resumo.leituras;const labels=data.por_dispositivo.map(item=>item.dispositivo),energy=data.por_dispositivo.map(item=>item.energia_kwh),cost=data.por_dispositivo.map(item=>item.custo_brl),colors=['#2e6b59','#d96b3d','#4778a8','#e8b94f','#8b6ba8','#5b8e8e'];if(energiaChart)energiaChart.destroy();if(custoChart)custoChart.destroy();energiaChart=new Chart(document.getElementById('grafico-energia'),{type:'pie',data:{labels,datasets:[{data:energy,backgroundColor:colors}]},options:{responsive:true,maintainAspectRatio:false}});custoChart=new Chart(document.getElementById('grafico-custo'),{type:'pie',data:{labels,datasets:[{data:cost,backgroundColor:colors}]},options:{responsive:true,maintainAspectRatio:false}});document.getElementById('texto-energia').textContent=data.resumo.leituras?`Foram medidas ${data.resumo.energia_kwh.toLocaleString('pt-BR')} kWh em ${data.resumo.dispositivos} dispositivo(s), com custo estimado de ${money(data.resumo.custo_brl)}.`:'Ainda não há leituras do ESP32.';document.getElementById('tabela-energia').innerHTML=data.leituras.slice().reverse().slice(0,30).map(item=>`<tr><td>${item.timestamp}</td><td>${item.dispositivo}</td><td>${item.energia_kwh.toLocaleString('pt-BR')} kWh</td><td>${item.potencia_w.toLocaleString('pt-BR')} W</td><td>${money(item.custo_brl)}</td></tr>`).join('')||'<tr><td colspan="5" class="empty">Aguardando dados.</td></tr>';}catch(error){document.getElementById('texto-energia').textContent='Não foi possível carregar as leituras.';}}
++</script></body></html>

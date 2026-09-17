@@ -1,6 +1,7 @@
 flask
 pandas
 openpyxl
+xlrd
 requests
 openai
 python-dotenv
