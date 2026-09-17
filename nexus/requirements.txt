@@ -1,0 +1,10 @@
+cat > requirements.txt << 'EOF'
+flask
+pandas
+openpyxl
+requests
+openai
+python-dotenv
+bcrypt
+flask-limiter
+EOF
