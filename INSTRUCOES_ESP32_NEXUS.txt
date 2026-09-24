@@ -33,7 +33,7 @@ dados_graos.xlsx
 =======================
 
 No Windows, instale o Python 3.12 ou mais recente pelo site oficial:
-https://www.python.org/downloads/windows/
+
 
 Durante a instalacao, marque:
 
@@ -50,13 +50,15 @@ Confirme a instalacao:
 3. INSTALACAO DAS DEPENDENCIAS
 ==============================
 
-Abra o PowerShell dentro da pasta do projeto:
+Abra o PowerShell dentro da pasta do projeto. A configuracao abaixo fica somente
+dentro desta pasta e nao precisa de administrador:
 
     cd C:\Users\20260325\Downloads\Nexus
 
-Instale as bibliotecas:
+Crie o ambiente virtual e instale as bibliotecas:
 
-    python -m pip install -r requirements.txt
+    python -m venv .venv
+    .venv\Scripts\python.exe -m pip install -r requirements.txt
 
 As principais bibliotecas sao:
 - Flask: servidor web.
@@ -73,7 +75,9 @@ As principais bibliotecas sao:
 
 Na pasta do projeto, execute:
 
-    python app.py
+    .venv\Scripts\python.exe app.py
+
+Ou use o script `iniciar_teste.ps1`.
 
 Abra no navegador:
 
@@ -314,6 +318,43 @@ Isso significa que os dados sao perdidos quando:
 - o servidor e reiniciado;
 - o computador e desligado;
 - o processo Flask e encerrado.
+
+
+16. RELATORIO CORPORATIVO E COMPARACAO ANUAL
+============================================
+
+O arquivo `Nexus_relatorio_corporativo_2026.xlsx` e um exemplo formatado para uma multinacional de graos. Ele possui:
+
+- `Despesas 2026`: despesas do ano atual, usadas na aba Resumo financeiro.
+- `Historico anual`: valores realizados de 2020 a 2026 e expectativa ficticia para 2027.
+- `Premissas`: observacoes sobre moeda, escopo e natureza dos dados.
+
+Ao enviar esse arquivo no site, o Resumo financeiro considera somente `Despesas 2026`. A aba `Comparativo anual` usa `Historico anual` para comparar os anos e identifica 2027 como projecao.
+
+O endpoint da comparacao e:
+
+    POST /api/comparar-anos
+
+17. COMPARACAO COM O BUDGET
+===========================
+
+A aba `Budget` possui uma linha para cada ano, mes e categoria. O Resumo financeiro soma o realizado por mes e categoria e compara com o valor planejado correspondente.
+
+Quando o arquivo possui Budget, o site mostra:
+
+- o budget total do periodo;
+- o percentual de economia ou de gasto acima do planejado;
+- alertas por mes e categoria;
+- um popup discreto com o resultado consolidado.
+
+18. COMPARAR VARIAS PLANILHAS
+=============================
+
+Na aba `Comparar planilhas`, selecione de 2 a 12 arquivos Excel. O site exibe os totais realizados, o budget quando existir e o percentual de desvio de cada arquivo.
+
+O endpoint usado por essa aba e:
+
+    POST /api/comparar-planilhas
 
 Para uso permanente, o proximo passo recomendado e salvar as leituras em SQLite ou PostgreSQL.
 

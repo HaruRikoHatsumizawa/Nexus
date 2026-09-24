@@ -1,0 +1,10 @@
+Comparar valores entre budget e gastos realizados
+aviso "pop uup" para a falta de certas despezas
+aba exclusiva para gastos/budget deste mes
+aba para gastos/budget para este ano
+grafico de linhas para expor variações de valores (focado em alimentação/gastos altamente variaveis) para a vizualização da faixa de variação
+sistema de login e conectar sistema ao banco de dados... com certos trabalhadores podendo acessar apenas a parte deles enquanto gerentes etc podem vizualizar a parte do brasil todo.
+adicionar aba com chatbot integrado para a realização de perguntas sobre as planilhas.
+pop up para expor economias e gastos maiores para facilitação da vizualização de como fazer 
+parte com separação de dados por "topicos", como "contratados", "compras", contrução, etc.
+integração com ia no site todo, para a possibilidade da ia analizar as planilhas sem depender de uma padronização pesada
