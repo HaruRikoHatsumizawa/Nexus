@@ -3,7 +3,10 @@
 # ============================================================
 
 import os
+import re
 import uuid
+import unicodedata
+from difflib import SequenceMatcher
 from io import BytesIO
 from datetime import datetime
 import pandas as pd
@@ -21,6 +24,125 @@ app.secret_key = os.getenv('SECRET_KEY', 'fallback-chave-insegura')
 app.config['MAX_CONTENT_LENGTH'] = 25 * 1024 * 1024
 ALLOWED_EXTENSIONS = {'.xlsx', '.xls'}
 LEITURAS_ENERGIA = []
+ALIASES_COLUNAS = {
+    'data': ('data', 'date', 'transaction date', 'posting date', 'fecha', 'fecha de operacion', 'datum', 'date de transaction', 'date comptable'),
+    'ano': ('ano', 'year', 'ejercicio', 'jahr', 'annee'),
+    'mes': ('mes', 'month', 'monat', 'mois'),
+    'categoria': ('categoria', 'category', 'expense category', 'cost center', 'cost centre', 'account', 'rubro', 'nature', 'kategorie', 'kostenart', 'department', 'division', 'business unit', 'supplier', 'vendor', 'supplier name', 'vendor name', 'proveedor', 'fornecedor', 'fournisseur', 'lieferant'),
+    'valor': ('valor', 'valor r$', 'valor total', 'total', 'amount', 'amount actual', 'actual amount', 'expense', 'expenses', 'spend', 'expenditure', 'cost', 'costs', 'importe', 'monto', 'gasto', 'montant', 'depense', 'depenses', 'betrag', 'ausgabe', 'ausgaben'),
+    'budget': ('budget', 'budget r$', 'budget amount', 'budgeted amount', 'planned amount', 'plan amount', 'presupuesto', 'orçamento', 'orcamento', 'montant budget', 'budget alloue', 'planwert', 'soll'),
+    'tipo': ('tipo', 'type', 'kind', 'nature type', 'typ', 'classe'),
+}
+
+
+def normalizar_cabecalho(valor):
+    texto = unicodedata.normalize('NFKD', str(valor).casefold())
+    texto = ''.join(caractere for caractere in texto if not unicodedata.combining(caractere))
+    return re.sub(r'[^a-z0-9]+', ' ', texto).strip()
+
+
+def mapear_colunas(colunas):
+    aliases = {
+        campo: {normalizar_cabecalho(alias) for alias in nomes}
+        for campo, nomes in ALIASES_COLUNAS.items()
+    }
+    candidatas = []
+    for coluna in colunas:
+        nome = normalizar_cabecalho(coluna)
+        if not nome:
+            continue
+        for campo, nomes in aliases.items():
+            similaridade = max(
+                1.0 if nome == alias else
+                0.98 if len(alias.split()) > 1 and alias in nome else
+                0.93 if len(alias) >= 5 and alias in nome.split() else
+                SequenceMatcher(None, nome, alias).ratio()
+                for alias in nomes
+            )
+            if similaridade >= 0.84:
+                candidatas.append((similaridade, campo, coluna))
+
+    mapeadas = {}
+    colunas_usadas = set()
+    for _, campo, coluna in sorted(candidatas, reverse=True, key=lambda item: item[0]):
+        if campo not in mapeadas and coluna not in colunas_usadas:
+            mapeadas[campo] = coluna
+            colunas_usadas.add(coluna)
+    return mapeadas
+
+
+def ler_abas_flexivel(arquivo):
+    excel = pd.ExcelFile(BytesIO(arquivo))
+    abas = {}
+    for nome_aba in excel.sheet_names:
+        previa = pd.read_excel(excel, sheet_name=nome_aba, header=None, nrows=12)
+        melhor_linha = None
+        melhor_pontuacao = 0
+        for indice, linha in previa.iterrows():
+            mapeamento = mapear_colunas(linha.dropna().tolist())
+            pontuacao = len(mapeamento)
+            if pontuacao > melhor_pontuacao:
+                melhor_linha = indice
+                melhor_pontuacao = pontuacao
+        cabecalho = melhor_linha if melhor_pontuacao >= 2 else 0
+        abas[nome_aba] = pd.read_excel(excel, sheet_name=nome_aba, header=cabecalho)
+    return abas
+
+
+def converter_numero_local(valor):
+    if pd.isna(valor):
+        return None
+    if isinstance(valor, (int, float)):
+        return float(valor)
+    texto = str(valor).strip()
+    negativo = texto.startswith('(') and texto.endswith(')')
+    if negativo:
+        texto = texto[1:-1]
+    texto = re.sub(r'(?i)(USD|EUR|BRL|CAD|AUD|GBP|CHF|JPY|CNY|INR|US\$|R\$|[$€£¥])', '', texto)
+    texto = re.sub(r'\s+', '', texto)
+    if re.search(r'[^0-9,.+\-]', texto):
+        return None
+    if not texto or texto in ('-', '+'):
+        return None
+    if ',' in texto and '.' in texto:
+        separador_decimal = ',' if texto.rfind(',') > texto.rfind('.') else '.'
+        separador_milhar = '.' if separador_decimal == ',' else ','
+        texto = texto.replace(separador_milhar, '').replace(separador_decimal, '.')
+    elif ',' in texto:
+        casas = len(texto) - texto.rfind(',') - 1
+        texto = texto.replace(',', '.') if casas in (1, 2) else texto.replace(',', '')
+    elif texto.count('.') > 1:
+        partes = texto.split('.')
+        texto = ''.join(partes[:-1]) + '.' + partes[-1]
+    elif '.' in texto and len(texto) - texto.rfind('.') - 1 == 3:
+        texto = texto.replace('.', '')
+    try:
+        numero = float(texto)
+        return -numero if negativo else numero
+    except ValueError:
+        return None
+
+
+def converter_mes_local(valor):
+    numero = converter_numero_local(valor)
+    if numero is not None:
+        return int(numero) if 1 <= numero <= 12 else None
+    mes = normalizar_cabecalho(valor)
+    aliases = {
+        'janeiro': 1, 'january': 1, 'enero': 1, 'janvier': 1, 'januar': 1,
+        'fevereiro': 2, 'february': 2, 'febrero': 2, 'fevrier': 2, 'februar': 2,
+        'marco': 3, 'march': 3, 'marzo': 3, 'mars': 3, 'marz': 3,
+        'abril': 4, 'april': 4, 'avril': 4,
+        'maio': 5, 'may': 5, 'mayo': 5, 'mai': 5,
+        'junho': 6, 'june': 6, 'junio': 6, 'juin': 6, 'juni': 6,
+        'julho': 7, 'july': 7, 'julio': 7, 'juillet': 7, 'juli': 7,
+        'agosto': 8, 'august': 8, 'aout': 8,
+        'setembro': 9, 'september': 9, 'septiembre': 9, 'septembre': 9,
+        'outubro': 10, 'october': 10, 'octubre': 10, 'octobre': 10, 'oktober': 10,
+        'novembro': 11, 'november': 11, 'noviembre': 11, 'novembre': 11,
+        'dezembro': 12, 'december': 12, 'diciembre': 12, 'decembre': 12, 'dezember': 12,
+    }
+    return aliases.get(mes)
 
 
 def serializar(valor):
@@ -34,12 +156,18 @@ def serializar(valor):
 
 
 def encontrar_coluna_valor(df):
+    coluna_mapeada = mapear_colunas(df.columns).get('valor')
+    if coluna_mapeada is not None:
+        valores_mapeados = df[coluna_mapeada].map(converter_numero_local)
+        if valores_mapeados.notna().mean() >= 0.35:
+            return coluna_mapeada, valores_mapeados
+
     palavras = ('valor', 'preço', 'preco', 'custo', 'total', 'amount', 'bill', 'despesa', 'gasto')
     candidatas = []
     for coluna in df.columns:
-        serie = pd.to_numeric(df[coluna], errors='coerce')
+        serie = df[coluna].map(converter_numero_local)
         taxa_numerica = serie.notna().mean()
-        nome = str(coluna).lower()
+        nome = normalizar_cabecalho(coluna)
         pontuacao = (3 if any(palavra in nome for palavra in palavras) else 0) + taxa_numerica
         if taxa_numerica >= 0.35:
             candidatas.append((pontuacao, coluna, serie))
@@ -50,28 +178,42 @@ def encontrar_coluna_valor(df):
 
 
 def analisar_planilha(arquivo, nome_arquivo='planilha.xlsx'):
-    abas = pd.read_excel(BytesIO(arquivo), sheet_name=None)
-    budget_df = abas.get('Budget')
-    if 'Historico anual' in abas:
-        nome_atual = next((nome for nome in abas if str(nome).lower().startswith('despesas 2026')), None)
-        if nome_atual:
-            abas = {nome_atual: abas[nome_atual]}
-        else:
-            abas = {nome: dados for nome, dados in abas.items() if nome not in ('Historico anual', 'Premissas')}
+    abas = ler_abas_flexivel(arquivo)
+    mapas_abas = {nome: mapear_colunas(df.columns) for nome, df in abas.items()}
+    abas_norm = {normalizar_cabecalho(nome): nome for nome in abas}
+    nomes_budget = {'budget', 'presupuesto', 'orcamento', 'budget table', 'budget annuel'}
+    nome_budget = next((
+        nome for nome, mapeamento in mapas_abas.items()
+        if {'ano', 'mes', 'categoria', 'budget'} <= mapeamento.keys() and 'valor' not in mapeamento
+    ), None)
+    if nome_budget is None:
+        nome_budget = next((nome for normalizado, nome in abas_norm.items() if normalizado in nomes_budget), None)
+    budget_df = abas.get(nome_budget) if nome_budget else None
+    nomes_historico = {'historico anual', 'annual history', 'historial anual', 'historique annuel', 'annual summary'}
+    nomes_premissas = {'premissas', 'assumptions', 'premisas', 'hypotheses', 'pramissen'}
+    abas = {
+        nome: dados for nome, dados in abas.items()
+        if normalizar_cabecalho(nome) not in nomes_historico | nomes_premissas
+        and nome != nome_budget
+        and not (
+            {'ano', 'categoria', 'valor'} <= mapas_abas[nome].keys()
+            and 'mes' not in mapas_abas[nome]
+        )
+    }
     registros = []
-    data_coluna = None
-    categoria_coluna = None
     resumo_abas = []
     for nome_aba, df in abas.items():
         df = df.dropna(how='all').copy()
+        colunas_mapeadas = mapear_colunas(df.columns)
+        if not {'data', 'categoria', 'mes', 'ano', 'tipo'}.intersection(colunas_mapeadas):
+            resumo_abas.append({'nome': nome_aba, 'linhas': len(df), 'coluna_valor': None, 'ignorada': True})
+            continue
         coluna_valor, valores = encontrar_coluna_valor(df)
         if coluna_valor is None:
             resumo_abas.append({'nome': nome_aba, 'linhas': len(df), 'coluna_valor': None, 'ignorada': True})
             continue
-        if data_coluna is None:
-            data_coluna = next((coluna for coluna in df.columns if str(coluna).lower() in ('data', 'date', 'mes')), None)
-        if categoria_coluna is None:
-            categoria_coluna = next((coluna for coluna in df.columns if any(p in str(coluna).lower() for p in ('categoria', 'tipo', 'descrição', 'descricao'))), None)
+        data_coluna = colunas_mapeadas.get('data')
+        categoria_coluna = colunas_mapeadas.get('categoria')
         validos = valores.dropna()
         for indice, valor in validos.items():
             linha = {str(coluna): serializar(df.loc[indice, coluna]) for coluna in df.columns}
@@ -89,16 +231,16 @@ def analisar_planilha(arquivo, nome_arquivo='planilha.xlsx'):
 
     budget_lookup = {}
     if budget_df is not None:
-        budget_colunas = {str(coluna).strip().lower(): coluna for coluna in budget_df.columns}
+        budget_colunas = mapear_colunas(budget_df.columns)
         ano_coluna = budget_colunas.get('ano')
         mes_coluna = budget_colunas.get('mes')
         budget_categoria = budget_colunas.get('categoria')
-        budget_valor = budget_colunas.get('budget (r$)') or budget_colunas.get('budget')
+        budget_valor = budget_colunas.get('budget') or budget_colunas.get('valor')
         if ano_coluna and mes_coluna and budget_categoria and budget_valor:
             for _, linha in budget_df.iterrows():
-                ano = pd.to_numeric(linha[ano_coluna], errors='coerce')
-                mes = pd.to_numeric(linha[mes_coluna], errors='coerce')
-                valor = pd.to_numeric(linha[budget_valor], errors='coerce')
+                ano = converter_numero_local(linha[ano_coluna])
+                mes = converter_mes_local(linha[mes_coluna])
+                valor = converter_numero_local(linha[budget_valor])
                 if not pd.isna(ano) and not pd.isna(mes) and not pd.isna(valor):
                     budget_lookup[(int(ano), int(mes), str(linha[budget_categoria]).strip())] = float(valor)
     for registro in registros:
@@ -138,9 +280,53 @@ def analisar_planilha(arquivo, nome_arquivo='planilha.xlsx'):
     budget_diferenca = round(realizado_total - budget_total, 2) if budget_total else None
     budget_percentual = round(abs(budget_diferenca) / budget_total * 100, 1) if budget_total else None
     budget_status = 'acima' if budget_diferenca and budget_diferenca > 0 else 'economia' if budget_diferenca is not None else 'indisponivel'
+
+    ano_atual, mes_atual = datetime.now().year, datetime.now().month
+
+    def resumir_budget_periodo(mes_periodo=None):
+        categorias_periodo = {}
+        for (ano_registro, mes_registro, nome_categoria), grupo in budget_grupos.items():
+            if ano_registro != ano_atual or (mes_periodo is not None and mes_registro != mes_periodo):
+                continue
+            categoria = categorias_periodo.setdefault(nome_categoria, {'realizado': 0.0, 'budget': 0.0})
+            categoria['realizado'] += grupo['realizado']
+            categoria['budget'] += grupo['budget']
+
+        realizado_periodo = round(sum(item['realizado'] for item in categorias_periodo.values()), 2)
+        budget_periodo = round(sum(item['budget'] for item in categorias_periodo.values()), 2)
+        diferenca_periodo = round(realizado_periodo - budget_periodo, 2)
+        categorias_resumidas = []
+        for nome_categoria, valores_categoria in categorias_periodo.items():
+            realizado_categoria = round(valores_categoria['realizado'], 2)
+            budget_categoria = round(valores_categoria['budget'], 2)
+            diferenca_categoria = round(realizado_categoria - budget_categoria, 2)
+            categorias_resumidas.append({
+                'categoria': str(nome_categoria),
+                'realizado': realizado_categoria,
+                'budget': budget_categoria,
+                'diferenca': diferenca_categoria,
+                'percentual': round(abs(diferenca_categoria) / budget_categoria * 100, 1) if budget_categoria else None,
+                'status': 'acima' if diferenca_categoria > 0 else 'economia' if budget_categoria else 'indisponivel',
+            })
+        categorias_resumidas.sort(key=lambda item: abs(item['diferenca']), reverse=True)
+        return {
+            'ano': ano_atual,
+            'mes': mes_periodo,
+            'realizado': realizado_periodo,
+            'budget': budget_periodo,
+            'diferenca': diferenca_periodo,
+            'percentual': round(abs(diferenca_periodo) / budget_periodo * 100, 1) if budget_periodo else None,
+            'status': 'acima' if diferenca_periodo > 0 else 'economia' if budget_periodo else 'indisponivel',
+            'categorias': categorias_resumidas,
+        }
+
+    budget_periodos = {
+        'ano': resumir_budget_periodo(),
+        'mes': resumir_budget_periodo(mes_atual),
+    }
     budget_alertas.sort(key=lambda item: abs(item['diferenca']), reverse=True)
     campos = [campo for campo in registros[0] if not campo.startswith('_') and campo not in ('classificacao', 'fora_do_padrao')]
-    categoria = next((campo for campo in campos if any(p in campo.lower() for p in ('categoria', 'tipo', 'descrição', 'descricao', 'fornecedor'))), None)
+    categoria = next((campo for campo in campos if mapear_colunas([campo]).get('categoria') == campo), None)
     grupos = []
     if categoria:
         agrupado = pd.DataFrame(registros).groupby(categoria)['_valor'].agg(['sum', 'count']).sort_values('sum', ascending=False).head(8)
@@ -153,6 +339,7 @@ def analisar_planilha(arquivo, nome_arquivo='planilha.xlsx'):
         'arquivo': secure_filename(nome_arquivo),
         'abas': resumo_abas,
         'metricas': {'total': realizado_total, 'media': round(media, 2), 'mediana': round(mediana, 2), 'quantidade': len(registros), 'acima_media': acima, 'fora_padrao': len(fora_padrao), 'budget_total': budget_total, 'budget_diferenca': budget_diferenca, 'budget_percentual': budget_percentual, 'budget_status': budget_status},
+        'budget_periodos': budget_periodos,
         'budget_alertas': budget_alertas[:12],
         'maior': {'valor': maior['_valor'], 'dados': limpar(maior)},
         'menor': {'valor': menor['_valor'], 'dados': limpar(menor)},
@@ -193,17 +380,22 @@ def comparar_anos_upload():
     if extensao not in ALLOWED_EXTENSIONS:
         return jsonify({'erro': 'Envie um arquivo .xlsx ou .xls.'}), 400
     try:
-        quadro = pd.read_excel(BytesIO(arquivo.read()), sheet_name='Historico anual')
-        colunas = {str(coluna).strip().lower(): coluna for coluna in quadro.columns}
-        coluna_ano = colunas.get('ano')
-        coluna_total = colunas.get('total (r$)') or colunas.get('total')
+        abas = ler_abas_flexivel(arquivo.read())
+        historicos = []
+        for nome_aba, dados_aba in abas.items():
+            colunas = mapear_colunas(dados_aba.columns)
+            if {'ano', 'categoria', 'valor'} <= colunas.keys() and 'mes' not in colunas:
+                historicos.append((nome_aba, dados_aba, colunas))
+        if not historicos:
+            raise ValueError('Não encontrei uma aba anual com colunas de ano, categoria e total.')
+        nome_aba_historico, quadro, colunas = max(historicos, key=lambda item: len(item[2]))
+        coluna_ano = colunas['ano']
+        coluna_total = colunas['valor']
         coluna_tipo = colunas.get('tipo')
-        coluna_categoria = colunas.get('categoria')
-        if not coluna_ano or not coluna_total or not coluna_categoria:
-            raise ValueError('A aba Historico anual precisa ter as colunas Ano, Categoria e Total (R$).')
+        coluna_categoria = colunas['categoria']
         quadro = quadro.copy()
-        quadro['__ano'] = pd.to_numeric(quadro[coluna_ano], errors='coerce')
-        quadro['__total'] = pd.to_numeric(quadro[coluna_total], errors='coerce')
+        quadro['__ano'] = quadro[coluna_ano].map(converter_numero_local)
+        quadro['__total'] = quadro[coluna_total].map(converter_numero_local)
         quadro = quadro.dropna(subset=['__ano', '__total', coluna_categoria])
         if quadro.empty:
             raise ValueError('A aba Historico anual não possui valores válidos.')
@@ -213,7 +405,8 @@ def comparar_anos_upload():
         anterior = None
         for ano, total in total_por_ano.items():
             variacao = None if anterior in (None, 0) else round((float(total) - anterior) / anterior * 100, 1)
-            tipo = 'Projecao' if coluna_tipo and str(quadro.loc[quadro['__ano'] == ano, coluna_tipo].iloc[0]).lower().startswith('pro') else 'Realizado'
+            tipo_valor = normalizar_cabecalho(quadro.loc[quadro['__ano'] == ano, coluna_tipo].iloc[0]) if coluna_tipo else ''
+            tipo = 'Projecao' if tipo_valor.startswith(('pro', 'forecast', 'project', 'plan', 'estim')) else 'Realizado'
             anos.append({'ano': int(ano), 'tipo': tipo, 'total': round(float(total), 2), 'variacao_percentual': variacao})
             anterior = float(total)
         por_categoria = quadro.pivot_table(index=coluna_categoria, columns='__ano', values='__total', aggfunc='sum', fill_value=0)
@@ -221,7 +414,7 @@ def comparar_anos_upload():
             {'categoria': str(categoria), 'valores': {str(int(ano)): round(float(valor), 2) for ano, valor in linha.items()}}
             for categoria, linha in por_categoria.iterrows()
         ]
-        return jsonify({'arquivo': secure_filename(arquivo.filename), 'anos': anos, 'categorias': categorias})
+        return jsonify({'arquivo': secure_filename(arquivo.filename), 'aba': nome_aba_historico, 'anos': anos, 'categorias': categorias})
     except ValueError as erro:
         return jsonify({'erro': str(erro)}), 422
     except Exception as erro:
