@@ -8,3 +8,4 @@ adicionar aba com chatbot integrado para a realização de perguntas sobre as pl
 pop up para expor economias e gastos maiores para facilitação da vizualização de como fazer 
 parte com separação de dados por "topicos", como "contratados", "compras", contrução, etc.
 integração com ia no site todo, para a possibilidade da ia analizar as planilhas sem depender de uma padronização pesada
+admin admin123

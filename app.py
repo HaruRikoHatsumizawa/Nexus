@@ -4,26 +4,48 @@
 
 import os
 import re
+import hmac
+import secrets
 import uuid
 import unicodedata
 from difflib import SequenceMatcher
 from io import BytesIO
-from datetime import datetime
+from datetime import datetime, timedelta
 import pandas as pd
 import requests
 import bcrypt
 from dotenv import load_dotenv
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template, redirect, session, url_for
 from werkzeug.utils import secure_filename
 
 # Carrega as variáveis do arquivo .env
 load_dotenv()
 
 app = Flask(__name__)
-app.secret_key = os.getenv('SECRET_KEY', 'fallback-chave-insegura')
+app.secret_key = os.getenv('SECRET_KEY') or secrets.token_hex(32)
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE='Lax',
+    SESSION_COOKIE_SECURE=os.getenv('SESSION_COOKIE_SECURE', 'false').lower() == 'true',
+    PERMANENT_SESSION_LIFETIME=timedelta(hours=8),
+)
 app.config['MAX_CONTENT_LENGTH'] = 25 * 1024 * 1024
 ALLOWED_EXTENSIONS = {'.xlsx', '.xls'}
 LEITURAS_ENERGIA = []
+ADMIN_USER = os.getenv('ADMIN_USER', '').strip()
+ADMIN_PASS_HASH = os.getenv('ADMIN_PASS_HASH', '')
+
+
+@app.before_request
+def exigir_login():
+    if request.endpoint in {'login', 'static', 'receber_leitura_energia'}:
+        return
+    if ADMIN_USER and session.get('usuario') == ADMIN_USER:
+        return
+    session.clear()
+    if request.path.startswith('/api/'):
+        return jsonify({'erro': 'Faça login para continuar.'}), 401
+    return redirect(url_for('login'))
 ALIASES_COLUNAS = {
     'data': ('data', 'date', 'transaction date', 'posting date', 'fecha', 'fecha de operacion', 'datum', 'date de transaction', 'date comptable'),
     'ano': ('ano', 'year', 'ejercicio', 'jahr', 'annee'),
@@ -354,6 +376,42 @@ def index():
     return render_template('index.html')
 
 
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if ADMIN_USER and session.get('usuario') == ADMIN_USER:
+        return redirect(url_for('index'))
+    if request.method == 'GET':
+        aviso = None if ADMIN_USER and ADMIN_PASS_HASH else 'Configure ADMIN_USER e ADMIN_PASS_HASH no arquivo .env.'
+        return render_template('login.html', erro=None, aviso=aviso)
+    if not ADMIN_USER or not ADMIN_PASS_HASH:
+        return render_template(
+            'login.html',
+            erro='O login ainda não foi configurado no servidor.',
+            aviso=None,
+        ), 503
+
+    usuario = request.form.get('usuario', '').strip()
+    senha = request.form.get('senha', '')
+    try:
+        senha_valida = bcrypt.checkpw(senha.encode('utf-8'), ADMIN_PASS_HASH.encode('utf-8'))
+    except (TypeError, ValueError):
+        senha_valida = False
+
+    if not hmac.compare_digest(usuario, ADMIN_USER) or not senha_valida:
+        return render_template('login.html', erro='Usuário ou senha inválidos.', aviso=None), 401
+
+    session.clear()
+    session['usuario'] = ADMIN_USER
+    session.permanent = True
+    return redirect(url_for('index'))
+
+
+@app.route('/logout', methods=['POST'])
+def logout():
+    session.clear()
+    return redirect(url_for('login'))
+
+
 @app.route('/api/analisar', methods=['POST'])
 def analisar_upload():
     arquivo = request.files.get('arquivo')
@@ -496,4 +554,4 @@ def receber_leitura_energia():
 
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(debug=True, use_reloader=False, host='0.0.0.0', port=5000)
