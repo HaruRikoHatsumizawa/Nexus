@@ -12,7 +12,6 @@ from difflib import SequenceMatcher
 from io import BytesIO
 from datetime import datetime, timedelta
 import pandas as pd
-import requests
 import bcrypt
 from dotenv import load_dotenv
 from flask import Flask, request, jsonify, render_template, redirect, session, url_for
