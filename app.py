@@ -16,24 +16,42 @@ import requests
 import bcrypt
 from dotenv import load_dotenv
 from flask import Flask, request, jsonify, render_template, redirect, session, url_for
+from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.utils import secure_filename
 
 # Carrega as variáveis do arquivo .env
 load_dotenv()
 
+APP_ENV = os.getenv('NEXUS_ENV', 'development').strip().lower()
+if APP_ENV not in {'development', 'production'}:
+    raise RuntimeError('NEXUS_ENV deve ser development ou production.')
+
+ADMIN_USER = os.getenv('ADMIN_USER', '').strip()
+ADMIN_PASS_HASH = os.getenv('ADMIN_PASS_HASH', '')
+SECRET_KEY = os.getenv('SECRET_KEY')
+if APP_ENV == 'production':
+    if not SECRET_KEY or len(SECRET_KEY) < 32:
+        raise RuntimeError('Configure SECRET_KEY com pelo menos 32 caracteres no ambiente de produção.')
+    if not ADMIN_USER or not ADMIN_PASS_HASH:
+        raise RuntimeError('Configure ADMIN_USER e ADMIN_PASS_HASH no ambiente de produção.')
+
 app = Flask(__name__)
-app.secret_key = os.getenv('SECRET_KEY') or secrets.token_hex(32)
+app.secret_key = SECRET_KEY or secrets.token_hex(32)
 app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE='Lax',
-    SESSION_COOKIE_SECURE=os.getenv('SESSION_COOKIE_SECURE', 'false').lower() == 'true',
+    SESSION_COOKIE_SECURE=(
+        APP_ENV == 'production'
+        or os.getenv('SESSION_COOKIE_SECURE', 'false').lower() == 'true'
+    ),
     PERMANENT_SESSION_LIFETIME=timedelta(hours=8),
 )
+if APP_ENV == 'production':
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1)
+
 app.config['MAX_CONTENT_LENGTH'] = 25 * 1024 * 1024
 ALLOWED_EXTENSIONS = {'.xlsx', '.xls'}
 LEITURAS_ENERGIA = []
-ADMIN_USER = os.getenv('ADMIN_USER', '').strip()
-ADMIN_PASS_HASH = os.getenv('ADMIN_PASS_HASH', '')
 
 
 @app.before_request
@@ -459,20 +477,96 @@ def comparar_anos_upload():
             raise ValueError('A aba Historico anual não possui valores válidos.')
         quadro['__ano'] = quadro['__ano'].astype(int)
         total_por_ano = quadro.groupby('__ano')['__total'].sum().sort_index()
+        tipos_por_ano = {}
+        for ano, grupo in quadro.groupby('__ano'):
+            tipo_valor = normalizar_cabecalho(grupo[coluna_tipo].iloc[0]) if coluna_tipo else ''
+            tipos_por_ano[int(ano)] = (
+                'Projecao'
+                if tipo_valor.startswith(('pro', 'forecast', 'project', 'plan', 'estim'))
+                else 'Realizado'
+            )
+
+        budget_por_ano = {}
+        budget_por_ano_categoria = {}
+        nomes_abas_budget = {'budget', 'orcamento', 'orcamentos', 'presupuesto', 'budget table'}
+        for nome_budget, dados_budget in abas.items():
+            colunas_budget = mapear_colunas(dados_budget.columns)
+            coluna_budget_ano = colunas_budget.get('ano')
+            coluna_budget_categoria = colunas_budget.get('categoria')
+            coluna_budget_valor = colunas_budget.get('budget')
+            if (
+                coluna_budget_valor is None
+                and normalizar_cabecalho(nome_budget) in nomes_abas_budget
+            ):
+                coluna_budget_valor = colunas_budget.get('valor')
+            if not all((coluna_budget_ano, coluna_budget_categoria, coluna_budget_valor)):
+                continue
+
+            quadro_budget = dados_budget.copy()
+            quadro_budget['__ano'] = quadro_budget[coluna_budget_ano].map(converter_numero_local)
+            quadro_budget['__budget'] = quadro_budget[coluna_budget_valor].map(converter_numero_local)
+            quadro_budget = quadro_budget.dropna(subset=['__ano', '__budget', coluna_budget_categoria])
+            for _, linha in quadro_budget.iterrows():
+                ano = int(linha['__ano'])
+                categoria = str(linha[coluna_budget_categoria]).strip()
+                valor_budget = float(linha['__budget'])
+                chave = (ano, categoria)
+                budget_por_ano_categoria[chave] = budget_por_ano_categoria.get(chave, 0.0) + valor_budget
+                budget_por_ano[ano] = budget_por_ano.get(ano, 0.0) + valor_budget
+            break
+
         anos = []
         anterior = None
         for ano, total in total_por_ano.items():
             variacao = None if anterior in (None, 0) else round((float(total) - anterior) / anterior * 100, 1)
-            tipo_valor = normalizar_cabecalho(quadro.loc[quadro['__ano'] == ano, coluna_tipo].iloc[0]) if coluna_tipo else ''
-            tipo = 'Projecao' if tipo_valor.startswith(('pro', 'forecast', 'project', 'plan', 'estim')) else 'Realizado'
-            anos.append({'ano': int(ano), 'tipo': tipo, 'total': round(float(total), 2), 'variacao_percentual': variacao})
+            ano_int = int(ano)
+            budget_ano = budget_por_ano.get(ano_int)
+            percentual_budget = round(float(total) / budget_ano * 100, 1) if budget_ano else None
+            anos.append({
+                'ano': ano_int,
+                'tipo': tipos_por_ano[ano_int],
+                'total': round(float(total), 2),
+                'budget': round(budget_ano, 2) if budget_ano is not None else None,
+                'percentual_budget': percentual_budget,
+                'variacao_percentual': variacao,
+            })
             anterior = float(total)
+
+        anos_realizados_com_budget = [
+            ano for ano in anos
+            if ano['tipo'] == 'Realizado' and ano['budget'] is not None
+        ]
+        resumo = {
+            'total_gastos': round(sum(ano['total'] for ano in anos_realizados_com_budget), 2),
+            'total_budget': round(sum(ano['budget'] for ano in anos_realizados_com_budget), 2),
+            'percentual_budget': None,
+            'anos_comparados': len(anos_realizados_com_budget),
+        }
+        if resumo['total_budget']:
+            resumo['percentual_budget'] = round(
+                resumo['total_gastos'] / resumo['total_budget'] * 100,
+                1,
+            )
+
         por_categoria = quadro.pivot_table(index=coluna_categoria, columns='__ano', values='__total', aggfunc='sum', fill_value=0)
         categorias = [
-            {'categoria': str(categoria), 'valores': {str(int(ano)): round(float(valor), 2) for ano, valor in linha.items()}}
+            {
+                'categoria': str(categoria),
+                'valores': {str(int(ano)): round(float(valor), 2) for ano, valor in linha.items()},
+                'budget_por_ano': {
+                    str(ano): round(budget_por_ano_categoria.get((ano, str(categoria).strip()), 0.0), 2)
+                    for ano in total_por_ano.index
+                },
+            }
             for categoria, linha in por_categoria.iterrows()
         ]
-        return jsonify({'arquivo': secure_filename(arquivo.filename), 'aba': nome_aba_historico, 'anos': anos, 'categorias': categorias})
+        return jsonify({
+            'arquivo': secure_filename(arquivo.filename),
+            'aba': nome_aba_historico,
+            'anos': anos,
+            'resumo': resumo,
+            'categorias': categorias,
+        })
     except ValueError as erro:
         return jsonify({'erro': str(erro)}), 422
     except Exception as erro:
@@ -554,4 +648,9 @@ def receber_leitura_energia():
 
 
 if __name__ == '__main__':
-    app.run(debug=True, use_reloader=False, host='0.0.0.0', port=5000)
+    app.run(
+        debug=os.getenv('FLASK_DEBUG', 'false').lower() == 'true' and APP_ENV != 'production',
+        use_reloader=False,
+        host='0.0.0.0',
+        port=int(os.getenv('PORT', '5000')),
+    )

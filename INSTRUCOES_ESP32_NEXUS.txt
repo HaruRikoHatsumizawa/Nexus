@@ -329,7 +329,7 @@ O arquivo `Nexus_relatorio_corporativo_2026.xlsx` e um exemplo formatado para um
 - `Historico anual`: valores realizados de 2020 a 2026 e expectativa ficticia para 2027.
 - `Premissas`: observacoes sobre moeda, escopo e natureza dos dados.
 
-Ao enviar esse arquivo no site, o Resumo financeiro considera somente `Despesas 2026`. A aba `Comparativo anual` usa `Historico anual` para comparar os anos e identifica 2027 como projecao.
+Ao enviar esse arquivo no site, o Resumo financeiro considera somente `Despesas 2026`. A aba `Comparativo anual` cruza `Historico anual` com a aba `Budget`, exibe gastos, budget e percentual utilizado por ano, e resume os anos realizados que possuem orçamento. A projeção de 2027 permanece separada. O gráfico de pizza mostra a distribuição dos gastos realizados por categoria.
 
 O endpoint da comparacao e:
 
@@ -401,5 +401,46 @@ Abrir o site:
 
     http://localhost:5000
 
+
+18. PUBLICAR COM CLOUDFLARE TUNNEL
+==================================
+
+O aplicativo Flask nao roda diretamente em Cloudflare Pages/Workers. Para
+publica-lo a partir deste computador, use um Cloudflare Tunnel nomeado. O
+trafego HTTPS termina na Cloudflare e o tunnel encaminha as requisicoes para
+o Waitress em 127.0.0.1; a porta do servidor nao precisa ser aberta no roteador.
+
+Preparar o aplicativo:
+
+1. Copie `.env.example` para `.env`.
+2. Gere uma chave secreta com:
+
+       .venv\Scripts\python.exe -c "import secrets; print(secrets.token_urlsafe(48))"
+
+   Coloque o resultado em `SECRET_KEY`. Use pelo menos 32 caracteres.
+3. Configure `ADMIN_USER` e gere `ADMIN_PASS_HASH` para sua senha:
+
+       .venv\Scripts\python.exe -c "import bcrypt, getpass; print(bcrypt.hashpw(getpass.getpass('Senha: ').encode(), bcrypt.gensalt()).decode())"
+
+   Cole o hash gerado em `ADMIN_PASS_HASH`. Nao use uma senha em texto puro.
+4. No painel Cloudflare, crie um Tunnel, associe um hostname publico ao tunnel
+   e configure o servico de destino como `http://localhost:5000`.
+5. Instale `cloudflared` no Windows e defina `CLOUDFLARE_TUNNEL_TOKEN` como uma
+   variavel de ambiente do usuario usando o token fornecido pelo painel.
+   Trate esse token como uma senha e nao o envie por chat nem o grave no repositorio.
+6. Instale as dependencias (inclui Waitress) e inicie o tunnel:
+
+       .venv\Scripts\python.exe -m pip install -r requirements.txt
+       .\iniciar_cloudflare.ps1
+
+O script inicia o Waitress somente em `127.0.0.1`, habilita cookies seguros,
+desativa o modo debug e encerra o servidor local quando o tunnel termina. Os
+logs ficam em `logs\`. O aplicativo recusa iniciar em producao sem chave
+secreta de pelo menos 32 caracteres e credenciais administrativas.
+
+IMPORTANTE: `.env` esta ignorado para novos arquivos, mas se ja tiver sido
+adicionado ao Git anteriormente, o ignore nao o remove do historico. Verifique
+e remova-o do rastreamento antes de publicar o repositorio, sem compartilhar
+seu conteudo. Se credenciais reais ja foram versionadas, troque-as.
 
 FIM
