@@ -1,0 +1,77 @@
+NEXA - ANALISE FINANCEIRA
+=========================
+
+EXECUTAR LOCALMENTE NO WINDOWS
+------------------------------
+
+1. Instale Python 3.13 ou superior.
+2. Na pasta do projeto, crie o ambiente e instale as dependencias:
+
+       py -3.13 -m venv .venv
+       .venv\Scripts\python.exe -m pip install -r requirements.txt
+
+3. Configure o arquivo .env com NEXUS_ENV=development, ADMIN_USER e
+   ADMIN_PASS_HASH. Consulte .env.example para as variaveis esperadas.
+4. Inicie pelo VS Code com F5 ou execute:
+
+       .\iniciar_teste.ps1
+
+5. Abra http://localhost:5000.
+
+PUBLICAR NA CLOUDFLARE COM TUNNEL
+---------------------------------
+
+O Flask e executado no servidor local; o Cloudflare Tunnel fornece o acesso
+HTTPS publico e encaminha as requisicoes para ele.
+
+1. Copie .env.example para .env e configure NEXUS_ENV=production,
+   SECRET_KEY, ADMIN_USER e ADMIN_PASS_HASH. Gere uma chave secreta com:
+
+       .venv\Scripts\python.exe -c "import secrets; print(secrets.token_urlsafe(48))"
+
+   Gere o hash da senha administrativa com:
+
+       .venv\Scripts\python.exe -c "import bcrypt, getpass; print(bcrypt.hashpw(getpass.getpass('Senha: ').encode(), bcrypt.gensalt()).decode())"
+
+2. No painel Cloudflare, crie um Tunnel nomeado e associe o hostname publico
+   ao servico http://localhost:5000.
+3. Instale cloudflared e configure CLOUDFLARE_TUNNEL_TOKEN nas variaveis de
+   ambiente do Windows. Trate esse token como uma senha: nao o grave no Git.
+4. Inicie a aplicacao e o tunnel:
+
+       .venv\Scripts\python.exe -m pip install -r requirements.txt
+       .\iniciar_cloudflare.ps1
+
+O script de tunnel inicia o Waitress em 127.0.0.1, ativa cookies seguros e
+desativa o modo debug. A porta do servidor nao precisa ser aberta no roteador.
+
+PUBLICAR COMO CLOUDFLARE WORKER
+-------------------------------
+
+O repositorio tambem contem um Worker Python com banco D1 para sessoes. O
+deploy automatico e acionado por push para main e requer os secrets
+CLOUDFLARE_ACCOUNT_ID e CLOUDFLARE_API_TOKEN no GitHub Actions. Para aplicar
+migracoes pendentes no banco remoto, use Wrangler:
+
+       npx wrangler d1 migrations apply nexa-db --remote
+
+A migracao 0002 remove a tabela antiga de leituras ESP32; ela preserva a tabela
+sessoes usada pelo login. A migracao 0003 remove a tabela legada energy_readings
+e cria o arquivo de planilhas original no D1.
+
+Para habilitar o arquivo persistente no D1, aplique todas as migracoes pendentes
+depois de revisar o banco:
+
+       npx wrangler d1 migrations apply nexa-db --remote
+
+Os arquivos enviados ficam listados na aba Planilhas salvas. No Worker, o
+conteudo original e dividido em blocos dentro do D1; no modo local, fica em
+uploads/ e nao e enviado ao Git.
+
+SEGURANCA
+---------
+
+- O arquivo .env e ignorado pelo Git; nunca publique seus segredos.
+- Se credenciais reais ja foram versionadas, troque-as.
+- O servidor Flask de desenvolvimento nao deve ser exposto diretamente na
+  internet. Para acesso publico, use o fluxo Waitress + Cloudflare Tunnel.

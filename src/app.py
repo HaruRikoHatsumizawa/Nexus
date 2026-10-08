@@ -1,22 +1,4 @@
-import os
-from pathlib import Path
-
-import src.app as _backend
-
-_backend.app.template_folder = str(Path(__file__).parent / "templates")
-
-
-def __getattr__(name):
-    return getattr(_backend, name)
-
-
-if __name__ == "__main__":
-    _backend.app.run(
-        debug=os.getenv('FLASK_DEBUG', 'false').lower() == 'true' and _backend.APP_ENV != 'production',
-        use_reloader=False,
-        host='0.0.0.0',
-        port=int(os.getenv('PORT', '5000')),
-    )# ============================================================
+# ============================================================
 # app.py - Sistema de Análise de Dados com Flask
 # ============================================================
 
@@ -63,7 +45,7 @@ if APP_ENV == 'production':
         raise RuntimeError('Configure ADMIN_USER e ADMIN_PASS_HASH no ambiente de produção.')
 
 app = Flask(__name__)
-app.secret_key = SECRET_KEY or secrets.token_hex(32)
+app.secret_key = SECRET_KEY or ('' if run_sync is not None else secrets.token_hex(32))
 app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE='Lax',
@@ -124,9 +106,12 @@ def _d1_first_value(sql, params=()):
         return None
     row = rows[0]
     try:
-        return next(iter(row.values()))
-    except AttributeError:
-        return None
+        return row['token']
+    except (AttributeError, KeyError, TypeError):
+        try:
+            return row.token
+        except AttributeError:
+            return None
 
 
 def _store_spreadsheet(filename, content):
@@ -143,7 +128,7 @@ def _store_spreadsheet(filename, content):
         if existing:
             return existing[0]
 
-    archive = Path(app.root_path) / 'uploads'
+    archive = Path(app.root_path).parent / 'uploads'
     if db is None and archive.exists():
         for metadata_path in archive.glob('*.json'):
             try:
@@ -198,7 +183,7 @@ def _list_spreadsheets():
     )
     if rows is not None:
         return rows
-    archive = Path(app.root_path) / 'uploads'
+    archive = Path(app.root_path).parent / 'uploads'
     if not archive.exists():
         return []
     metadata = []
@@ -231,7 +216,7 @@ def _read_spreadsheet(spreadsheet_id):
                 return None
             chunks.append(base64.b64decode(rows[0]['data_b64']))
         return b''.join(chunks)
-    archive = Path(app.root_path) / 'uploads'
+    archive = Path(app.root_path).parent / 'uploads'
     matches = list(archive.glob(f'{spreadsheet_id}_*')) if archive.exists() else []
     return matches[0].read_bytes() if matches else None
 

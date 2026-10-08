@@ -6,4 +6,8 @@ if (-not (Test-Path $python)) {
 }
 
 Set-Location $PSScriptRoot
+if (Test-Path (Join-Path $PSScriptRoot '.env')) {
+    'NEXUS_ENV', 'PORT', 'SESSION_COOKIE_SECURE', 'SECRET_KEY', 'ADMIN_USER', 'ADMIN_PASS_HASH' |
+        ForEach-Object { Remove-Item "Env:$_" -ErrorAction SilentlyContinue }
+}
 & $python app.py

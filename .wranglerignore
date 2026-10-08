@@ -1,0 +1,13 @@
+.git/
+.venv/
+.venv-workers/
+**/__pycache__/
+nexus/
+*.xlsx
+*.xls
+coisas.txt
+INSTRUCOES_ESP32_NEXUS.txt
+INSTRUCOES_NEXUS.txt
+testar_energia.ps1
+iniciar_teste.ps1
+iniciar_cloudflare.ps1

@@ -1,10 +1,12 @@
 .venv/
+.venv-workers/
 __pycache__/
 **/__pycache__/
 *.py[cod]
 ~$*.xlsx
 .env
 logs/
+uploads/
 .env.*
 !.env.example
 *.env
