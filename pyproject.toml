@@ -1,0 +1,19 @@
+[project]
+name = "nexa"
+version = "1.0.0"
+description = "Nexa - análise financeira, budget e telemetria ESP32"
+requires-python = ">=3.13"
+dependencies = [
+    "flask",
+    "pandas",
+    "openpyxl",
+    "xlrd",
+    "python-dotenv",
+    "bcrypt"
+]
+
+[dependency-groups]
+dev = [
+    "workers-py>=1.72.0",
+    "workers-runtime-sdk"
+]

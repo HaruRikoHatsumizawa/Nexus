@@ -1,0 +1,15 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "nexa",
+  "main": "src/worker.py",
+  "compatibility_date": "2026-10-07",
+  "compatibility_flags": ["python_workers"],
+  "d1_databases": [
+    {
+      "binding": "NEXA_DB",
+      "database_name": "nexa-db",
+      "database_id": "6953b0bb-6623-4d5b-aae5-621a584dfb43",
+      "migrations_dir": "migrations"
+    }
+  ]
+}

@@ -12,12 +12,16 @@ from difflib import SequenceMatcher
 from io import BytesIO
 from datetime import datetime, timedelta
 import pandas as pd
-import requests
 import bcrypt
 from dotenv import load_dotenv
 from flask import Flask, request, jsonify, render_template, redirect, session, url_for
 from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.utils import secure_filename
+
+try:
+    from pyodide.ffi import run_sync
+except ImportError:
+    run_sync = None
 
 # Carrega as variáveis do arquivo .env
 load_dotenv()
@@ -54,12 +58,70 @@ ALLOWED_EXTENSIONS = {'.xlsx', '.xls'}
 LEITURAS_ENERGIA = []
 
 
+def _cloudflare_env():
+    try:
+        return request.environ.get('workers.env')
+    except (RuntimeError, AttributeError):
+        return None
+
+
+def _d1():
+    env = _cloudflare_env()
+    return getattr(env, 'NEXA_DB', None) if env is not None else None
+
+
+def _d1_rows(sql, params=()):
+    db = _d1()
+    if db is None or run_sync is None:
+        return None
+    statement = db.prepare(sql)
+    if params:
+        statement = statement.bind(*params)
+    result = run_sync(statement.all())
+    try:
+        return result.results.to_py()
+    except AttributeError:
+        return []
+
+
+def _d1_run(sql, params=()):
+    db = _d1()
+    if db is None or run_sync is None:
+        return False
+    statement = db.prepare(sql)
+    if params:
+        statement = statement.bind(*params)
+    run_sync(statement.run())
+    return True
+
+
+def _d1_first_value(sql, params=()):
+    rows = _d1_rows(sql, params)
+    if not rows:
+        return None
+    row = rows[0]
+    try:
+        return next(iter(row.values()))
+    except AttributeError:
+        return None
+
+
 @app.before_request
 def exigir_login():
     if request.endpoint in {'login', 'static', 'receber_leitura_energia'}:
         return
+
     if ADMIN_USER and session.get('usuario') == ADMIN_USER:
-        return
+        token = session.get('token_sessao')
+        if token:
+            token_d1 = _d1_first_value('SELECT token FROM sessoes WHERE usuario = ?', (ADMIN_USER,))
+            if token_d1 is None and _d1() is not None:
+                session.clear()
+            elif token_d1 is None or hmac.compare_digest(str(token_d1), str(token)):
+                return
+        elif _d1() is None:
+            return
+
     session.clear()
     if request.path.startswith('/api/'):
         return jsonify({'erro': 'Faça login para continuar.'}), 401
@@ -420,12 +482,21 @@ def login():
 
     session.clear()
     session['usuario'] = ADMIN_USER
+    session['token_sessao'] = secrets.token_urlsafe(32)
     session.permanent = True
+    _d1_run(
+        'INSERT INTO sessoes (usuario, token, atualizado_em) VALUES (?, ?, CURRENT_TIMESTAMP) '
+        'ON CONFLICT(usuario) DO UPDATE SET token=excluded.token, atualizado_em=excluded.atualizado_em',
+        (ADMIN_USER, session['token_sessao']),
+    )
     return redirect(url_for('index'))
 
 
 @app.route('/logout', methods=['POST'])
 def logout():
+    usuario = session.get('usuario')
+    if usuario:
+        _d1_run('DELETE FROM sessoes WHERE usuario = ?', (usuario,))
     session.clear()
     return redirect(url_for('login'))
 
@@ -600,7 +671,14 @@ def comparar_planilhas_upload():
 
 @app.route('/api/energia', methods=['GET'])
 def obter_energia():
-    leituras = LEITURAS_ENERGIA[-500:]
+    leituras_d1 = _d1_rows(
+        'SELECT timestamp, dispositivo, energia_kwh, custo_brl, potencia_w, tensao_v, corrente_a '
+        'FROM energia_leituras ORDER BY id DESC LIMIT 500'
+    )
+    if leituras_d1 is not None:
+        leituras = list(reversed(leituras_d1))
+    else:
+        leituras = LEITURAS_ENERGIA[-500:]
     total_kwh = sum(leitura['energia_kwh'] for leitura in leituras)
     total_custo = sum(leitura['custo_brl'] for leitura in leituras)
     por_dispositivo = {}
@@ -642,8 +720,24 @@ def receber_leitura_energia():
             raise ValueError
     except (KeyError, TypeError, ValueError):
         return jsonify({'erro': 'Envie energia_kwh e valores numéricos válidos.'}), 400
-    LEITURAS_ENERGIA.append(leitura)
-    del LEITURAS_ENERGIA[:-500]
+    if _d1() is not None:
+        _d1_run(
+            'INSERT INTO energia_leituras '
+            '(timestamp, dispositivo, energia_kwh, custo_brl, potencia_w, tensao_v, corrente_a) '
+            'VALUES (?, ?, ?, ?, ?, ?, ?)',
+            (
+                leitura['timestamp'],
+                leitura['dispositivo'],
+                leitura['energia_kwh'],
+                leitura['custo_brl'],
+                leitura['potencia_w'],
+                leitura['tensao_v'],
+                leitura['corrente_a'],
+            ),
+        )
+    else:
+        LEITURAS_ENERGIA.append(leitura)
+        del LEITURAS_ENERGIA[:-500]
     return jsonify({'mensagem': 'Leitura recebida.', 'leitura': leitura}), 201
 
 
