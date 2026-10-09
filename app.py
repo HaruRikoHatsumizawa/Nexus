@@ -409,6 +409,115 @@ def encontrar_coluna_valor(df):
     return coluna, serie
 
 
+def encontrar_coluna_eletricidade(colunas, campo):
+    aliases = {
+        'consumo_kwh': (
+            'consumo kwh', 'consumo de kwh', 'kwh consumido', 'kwh consumidos',
+            'energia consumida kwh', 'consumption kwh', 'kwh consumption',
+            'energy consumption kwh', 'kwh used', 'consumo de energia',
+            'consumo energia', 'consumo eletrico',
+            'consumo de eletricidade', 'consumo',
+        ),
+        'total': (
+            'valor total', 'total a pagar', 'valor a pagar', 'total da fatura',
+            'valor da fatura', 'valor da conta', 'valor cobrado', 'total da conta',
+            'total faturado', 'conta de energia', 'conta de luz', 'total amount',
+            'amount due', 'invoice total', 'bill amount', 'amount', 'valor',
+            'total',
+        ),
+    }
+    nomes = [(coluna, normalizar_cabecalho(coluna)) for coluna in colunas]
+    nomes = [(coluna, nome) for coluna, nome in nomes if nome]
+    aliases_normalizados = [normalizar_cabecalho(alias) for alias in aliases[campo]]
+    for alias in aliases_normalizados:
+        coluna = next((coluna for coluna, nome in nomes if nome == alias), None)
+        if coluna is not None:
+            return coluna
+
+    if campo == 'consumo_kwh':
+        candidatas = [
+            (coluna, nome) for coluna, nome in nomes
+            if 'kwh' in nome and not any(
+                termo in nome for termo in ('tarifa', 'preco', 'price', 'rate', 'valor')
+            )
+        ]
+        if candidatas:
+            return candidatas[0][0]
+    else:
+        candidatas = [
+            (coluna, nome) for coluna, nome in nomes
+            if any(termo in nome for termo in ('total', 'fatura', 'cobrado', 'amount', 'bill', 'valor'))
+            and 'kwh' not in nome
+            and not any(termo in nome for termo in ('por kwh', 'unitario', 'unit price', 'rate', 'tarifa'))
+        ]
+        if candidatas:
+            return candidatas[0][0]
+    return None
+
+
+def ler_abas_eletricidade(arquivo):
+    excel = pd.ExcelFile(BytesIO(arquivo))
+    abas = {}
+    for nome_aba in excel.sheet_names:
+        previa = pd.read_excel(excel, sheet_name=nome_aba, header=None, nrows=12)
+        melhor_linha = None
+        melhor_pontuacao = 0
+        for indice, linha in previa.iterrows():
+            colunas = linha.dropna().tolist()
+            consumo = encontrar_coluna_eletricidade(colunas, 'consumo_kwh')
+            total = encontrar_coluna_eletricidade(colunas, 'total')
+            pontuacao = int(consumo is not None) + int(total is not None)
+            if pontuacao > melhor_pontuacao:
+                melhor_linha = indice
+                melhor_pontuacao = pontuacao
+        cabecalho = melhor_linha if melhor_pontuacao else 0
+        abas[nome_aba] = pd.read_excel(excel, sheet_name=nome_aba, header=cabecalho)
+    return abas
+
+
+def analisar_eletricidade(arquivo):
+    total_geral = 0.0
+    consumo_geral = 0.0
+    linhas_analisadas = 0
+    abas_analisadas = 0
+
+    for dados in ler_abas_eletricidade(arquivo).values():
+        coluna_consumo = encontrar_coluna_eletricidade(dados.columns, 'consumo_kwh')
+        coluna_total = encontrar_coluna_eletricidade(dados.columns, 'total')
+        if coluna_consumo is None or coluna_total is None:
+            continue
+
+        consumo = dados[coluna_consumo].map(
+            lambda valor: converter_numero_local(
+                re.sub(r'(?i)\s*kwh\s*$', '', str(valor).strip())
+                if isinstance(valor, str) else valor
+            )
+        )
+        total = dados[coluna_total].map(converter_numero_local)
+        linhas_validas = consumo.notna() & total.notna()
+        if not linhas_validas.any():
+            continue
+
+        consumo_geral += float(consumo[linhas_validas].sum())
+        total_geral += float(total[linhas_validas].sum())
+        linhas_analisadas += int(linhas_validas.sum())
+        abas_analisadas += 1
+
+    if not linhas_analisadas:
+        raise ValueError('Não encontrei colunas de valor total e consumo em kWh na planilha.')
+
+    consumo_arredondado = round(consumo_geral, 3)
+    total_arredondado = round(total_geral, 2)
+    return {
+        'total': total_arredondado,
+        'kwh': consumo_arredondado,
+        'valor_por_kwh': round(total_arredondado / consumo_arredondado, 6)
+        if consumo_arredondado else None,
+        'linhas': linhas_analisadas,
+        'abas': abas_analisadas,
+    }
+
+
 def analisar_planilha(arquivo, nome_arquivo='planilha.xlsx'):
     abas = ler_abas_flexivel(arquivo)
     mapas_abas = {nome: mapear_colunas(df.columns) for nome, df in abas.items()}
@@ -808,6 +917,58 @@ def comparar_planilhas_upload():
     if len(validos) < 2:
         return jsonify({'erro': 'Não foi possível analisar pelo menos duas planilhas.', 'resultados': resultados}), 422
     return jsonify({'resultados': resultados})
+
+
+@app.route('/api/analisar-eletricidade', methods=['POST'])
+def analisar_eletricidade_upload():
+    arquivos = [
+        arquivo for arquivo in request.files.getlist('arquivos')
+        if arquivo and arquivo.filename
+    ]
+    if not arquivos:
+        arquivo = request.files.get('arquivo')
+        if arquivo and arquivo.filename:
+            arquivos = [arquivo]
+    if not arquivos:
+        return jsonify({'erro': 'Escolha pelo menos uma planilha de eletricidade.'}), 400
+    if len(arquivos) > 12:
+        return jsonify({'erro': 'Envie no máximo 12 planilhas por análise.'}), 400
+
+    resultados = []
+    for arquivo in arquivos:
+        nome_arquivo = secure_filename(arquivo.filename) or 'planilha.xlsx'
+        if os.path.splitext(nome_arquivo)[1].lower() not in ALLOWED_EXTENSIONS:
+            resultados.append({'arquivo': nome_arquivo, 'erro': 'Formato não aceito.'})
+            continue
+        try:
+            metricas = analisar_eletricidade(arquivo.read())
+            resultados.append({'arquivo': nome_arquivo, **metricas})
+        except ValueError as erro:
+            resultados.append({'arquivo': nome_arquivo, 'erro': str(erro)})
+        except Exception as erro:
+            print(f'Erro ao analisar eletricidade em {nome_arquivo}: {erro}')
+            resultados.append({
+                'arquivo': nome_arquivo,
+                'erro': 'Não foi possível ler essa planilha. Confira se ela não está corrompida.',
+            })
+
+    validos = [resultado for resultado in resultados if 'total' in resultado]
+    if not validos:
+        return jsonify({
+            'erro': 'Nenhuma planilha pôde ser analisada.',
+            'resultados': resultados,
+        }), 422
+
+    total_geral = round(sum(item['total'] for item in validos), 2)
+    consumo_geral = round(sum(item['kwh'] for item in validos), 3)
+    return jsonify({
+        'resultados': resultados,
+        'metricas': {
+            'total': total_geral,
+            'kwh': consumo_geral,
+            'valor_por_kwh': round(total_geral / consumo_geral, 6) if consumo_geral else None,
+        },
+    })
 
 
 @app.route('/api/planilhas', methods=['GET'])

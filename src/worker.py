@@ -3,6 +3,7 @@ import os
 from workers import WorkerEntrypoint, wsgi
 
 from app import app
+import src.app as backend
 
 app.template_folder = os.path.join(os.path.dirname(__file__), "templates")
 
@@ -17,11 +18,8 @@ class Default(WorkerEntrypoint):
         if secret_key:
             app.secret_key = secret_key
         if admin_user is not None:
-            app.config["ADMIN_USER"] = str(admin_user)
-            import app as backend
             backend.ADMIN_USER = str(admin_user).strip()
         if admin_hash is not None:
-            import app as backend
             backend.ADMIN_PASS_HASH = str(admin_hash)
         if openai_key is not None:
             os.environ["OPENAI_API_KEY"] = str(openai_key)
