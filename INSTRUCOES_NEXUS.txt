@@ -82,9 +82,18 @@ depois de revisar o banco:
 
        npx wrangler d1 migrations apply nexa-db --remote
 
-Os arquivos enviados ficam listados na aba Planilhas salvas. No Worker, o
-conteudo original e dividido em blocos dentro do D1; no modo local, fica em
-uploads/ e nao e enviado ao Git.
+No painel, escolha o arquivo e use “Analisar” para processar sem arquivar,
+“Upload” para arquivar sem analisar ou “Analisar e salvar” para fazer as duas
+acoes. Na aba Planilhas salvas, os arquivos podem ser analisados sem download,
+baixados ou excluidos com confirmacao. Tambem podem ser comparados em conjunto,
+incluindo totais, quantidades, medias, budgets e totais por categoria.
+
+No Worker, o conteudo original e dividido em blocos dentro do D1 remoto. Assim,
+arquivos enviados ao Worker ficam acessiveis por outros computadores com login
+e permanecem armazenados enquanto o banco e a conta Cloudflare existirem. Isso
+nao substitui um backup: apagar o banco/conta ou perder acesso a conta tambem
+remove o arquivo. No modo local, os arquivos ficam em uploads/ e nao sao
+enviados ao Git nem sincronizados com o D1.
 
 SEGURANCA
 ---------

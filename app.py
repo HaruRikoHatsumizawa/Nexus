@@ -3,7 +3,7 @@ from pathlib import Path
 
 import src.app as _backend
 
-_backend.app.template_folder = str(Path(__file__).parent / "templates")
+_backend.app.template_folder = str(Path(__file__).parent / "src" / "templates")
 
 
 def __getattr__(name):

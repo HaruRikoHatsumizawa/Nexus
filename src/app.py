@@ -221,21 +221,42 @@ def _read_spreadsheet(spreadsheet_id):
     return matches[0].read_bytes() if matches else None
 
 
+def _delete_spreadsheet(spreadsheet_id):
+    if _d1() is not None:
+        if run_sync is None:
+            raise RuntimeError('D1 está disponível, mas a ponte assíncrona não foi carregada.')
+        _d1_run('DELETE FROM uploaded_spreadsheets WHERE id = ?', (spreadsheet_id,))
+        return
+
+    archive = Path(app.root_path).parent / 'uploads'
+    for file_path in archive.glob(f'{spreadsheet_id}_*'):
+        file_path.unlink()
+    metadata_path = archive / f'{spreadsheet_id}.json'
+    if metadata_path.exists():
+        metadata_path.unlink()
+
+
+def _admin_session_is_valid():
+    if not ADMIN_USER or session.get('usuario') != ADMIN_USER:
+        return False
+
+    token = session.get('token_sessao')
+    if not token:
+        return _d1() is None
+
+    token_d1 = _d1_first_value('SELECT token FROM sessoes WHERE usuario = ?', (ADMIN_USER,))
+    if token_d1 is None and _d1() is not None:
+        return False
+    return token_d1 is None or hmac.compare_digest(str(token_d1), str(token))
+
+
 @app.before_request
 def exigir_login():
     if request.endpoint in {'login', 'static'}:
         return
 
-    if ADMIN_USER and session.get('usuario') == ADMIN_USER:
-        token = session.get('token_sessao')
-        if token:
-            token_d1 = _d1_first_value('SELECT token FROM sessoes WHERE usuario = ?', (ADMIN_USER,))
-            if token_d1 is None and _d1() is not None:
-                session.clear()
-            elif token_d1 is None or hmac.compare_digest(str(token_d1), str(token)):
-                return
-        elif _d1() is None:
-            return
+    if _admin_session_is_valid():
+        return
 
     session.clear()
     if request.path.startswith('/api/'):
@@ -544,10 +565,19 @@ def analisar_planilha(arquivo, nome_arquivo='planilha.xlsx'):
     budget_alertas.sort(key=lambda item: abs(item['diferenca']), reverse=True)
     campos = [campo for campo in registros[0] if not campo.startswith('_') and campo not in ('classificacao', 'fora_do_padrao')]
     categoria = next((campo for campo in campos if mapear_colunas([campo]).get('categoria') == campo), None)
-    grupos = []
+    grupos_completos = []
     if categoria:
-        agrupado = pd.DataFrame(registros).groupby(categoria)['_valor'].agg(['sum', 'count']).sort_values('sum', ascending=False).head(8)
-        grupos = [{'nome': str(indice), 'total': round(float(linha['sum']), 2), 'quantidade': int(linha['count'])} for indice, linha in agrupado.iterrows()]
+        agrupado_completo = (
+            pd.DataFrame(registros)
+            .groupby(categoria)['_valor']
+            .agg(['sum', 'count'])
+            .sort_values('sum', ascending=False)
+        )
+        grupos_completos = [
+            {'nome': str(indice), 'total': round(float(linha['sum']), 2), 'quantidade': int(linha['count'])}
+            for indice, linha in agrupado_completo.iterrows()
+        ]
+    grupos = grupos_completos[:8]
 
     def limpar(registro):
         return {chave: valor for chave, valor in registro.items() if not chave.startswith('_') or chave == '_aba'}
@@ -562,6 +592,7 @@ def analisar_planilha(arquivo, nome_arquivo='planilha.xlsx'):
         'menor': {'valor': menor['_valor'], 'dados': limpar(menor)},
         'fora_padrao': [{'valor': registro['_valor'], 'dados': limpar(registro)} for registro in sorted(fora_padrao, key=lambda item: item['_valor'], reverse=True)[:12]],
         'grupos': grupos,
+        'grupos_completos': grupos_completos,
         'colunas': campos,
         'registros': [limpar(registro) for registro in sorted(registros, key=lambda item: item['_valor'], reverse=True)[:20]],
     }
@@ -573,8 +604,10 @@ def index():
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    if ADMIN_USER and session.get('usuario') == ADMIN_USER:
+    if _admin_session_is_valid():
         return redirect(url_for('index'))
+    if session.get('usuario') or session.get('token_sessao'):
+        session.clear()
     if request.method == 'GET':
         aviso = None if ADMIN_USER and ADMIN_PASS_HASH else 'Configure ADMIN_USER e ADMIN_PASS_HASH no arquivo .env.'
         return render_template('login.html', erro=None, aviso=aviso)
@@ -627,7 +660,8 @@ def analisar_upload():
     try:
         conteudo = arquivo.read()
         resultado = analisar_planilha(conteudo, arquivo.filename)
-        resultado['arquivo_salvo'] = _store_spreadsheet(arquivo.filename, conteudo)
+        if request.form.get('salvar') == 'true':
+            resultado['arquivo_salvo'] = _store_spreadsheet(arquivo.filename, conteudo)
         return jsonify(resultado)
     except ValueError as erro:
         return jsonify({'erro': str(erro)}), 422
@@ -751,7 +785,6 @@ def comparar_anos_upload():
             for categoria, linha in por_categoria.iterrows()
         ]
         return jsonify({
-            'arquivo_salvo': _store_spreadsheet(arquivo.filename, conteudo),
             'arquivo': secure_filename(arquivo.filename),
             'aba': nome_aba_historico,
             'anos': anos,
@@ -781,11 +814,11 @@ def comparar_planilhas_upload():
         try:
             conteudo = arquivo.read()
             analise = analisar_planilha(conteudo, arquivo.filename)
-            arquivo_salvo = _store_spreadsheet(arquivo.filename, conteudo)
             resultados.append({
                 'arquivo': analise['arquivo'],
-                'arquivo_salvo': arquivo_salvo,
                 'metricas': analise['metricas'],
+                'abas': len(analise['abas']),
+                'categorias': analise['grupos_completos'],
             })
         except Exception as erro:
             resultados.append({'arquivo': secure_filename(arquivo.filename), 'erro': str(erro)})
@@ -795,9 +828,66 @@ def comparar_planilhas_upload():
     return jsonify({'resultados': resultados})
 
 
-@app.route('/api/planilhas', methods=['GET'])
+@app.route('/api/planilhas', methods=['GET', 'POST'])
 def listar_planilhas_salvas():
+    if request.method == 'POST':
+        arquivo = request.files.get('arquivo')
+        extensao = os.path.splitext(arquivo.filename)[1].lower() if arquivo and arquivo.filename else ''
+        if not arquivo or not arquivo.filename:
+            return jsonify({'erro': 'Escolha um arquivo Excel para salvar.'}), 400
+        if extensao not in ALLOWED_EXTENSIONS:
+            return jsonify({'erro': 'Envie um arquivo .xlsx ou .xls.'}), 400
+        try:
+            conteudo = arquivo.read()
+            if not conteudo:
+                return jsonify({'erro': 'O arquivo está vazio.'}), 400
+            metadata = _store_spreadsheet(arquivo.filename, conteudo)
+            return jsonify({'arquivo_salvo': metadata}), 201
+        except Exception as erro:
+            print(f'Erro ao salvar planilha: {erro}')
+            return jsonify({'erro': 'Não foi possível salvar a planilha no arquivo compartilhado.'}), 500
     return jsonify({'planilhas': _list_spreadsheets()})
+
+
+@app.route('/api/planilhas/<spreadsheet_id>/analisar', methods=['GET'])
+def analisar_planilha_salva(spreadsheet_id):
+    if not re.fullmatch(r'[a-f0-9]{32}', spreadsheet_id):
+        return jsonify({'erro': 'Planilha não encontrada.'}), 404
+    metadata = next((item for item in _list_spreadsheets() if item['id'] == spreadsheet_id), None)
+    conteudo = _read_spreadsheet(spreadsheet_id)
+    if metadata is None or conteudo is None:
+        return jsonify({'erro': 'Planilha não encontrada.'}), 404
+    try:
+        return jsonify(analisar_planilha(conteudo, metadata['filename']))
+    except ValueError as erro:
+        return jsonify({'erro': str(erro)}), 422
+    except Exception as erro:
+        print(f'Erro ao analisar planilha salva {spreadsheet_id}: {erro}')
+        return jsonify({'erro': 'Não foi possível analisar a planilha salva.'}), 422
+
+
+@app.route('/api/planilhas/<spreadsheet_id>/comparar', methods=['GET'])
+def comparar_planilha_salva(spreadsheet_id):
+    if not re.fullmatch(r'[a-f0-9]{32}', spreadsheet_id):
+        return jsonify({'erro': 'Planilha não encontrada.'}), 404
+    metadata = next((item for item in _list_spreadsheets() if item['id'] == spreadsheet_id), None)
+    conteudo = _read_spreadsheet(spreadsheet_id)
+    if metadata is None or conteudo is None:
+        return jsonify({'erro': 'Planilha não encontrada.'}), 404
+    try:
+        analise = analisar_planilha(conteudo, metadata['filename'])
+        return jsonify({
+            'id': spreadsheet_id,
+            'arquivo': metadata['filename'],
+            'metricas': analise['metricas'],
+            'abas': len(analise['abas']),
+            'categorias': analise['grupos_completos'],
+        })
+    except ValueError as erro:
+        return jsonify({'erro': str(erro)}), 422
+    except Exception as erro:
+        print(f'Erro ao comparar planilha salva {spreadsheet_id}: {erro}')
+        return jsonify({'erro': 'Não foi possível comparar a planilha salva.'}), 422
 
 
 @app.route('/api/planilhas/<spreadsheet_id>/download', methods=['GET'])
@@ -814,6 +904,21 @@ def baixar_planilha_salva(spreadsheet_id):
         download_name=metadata['filename'],
         mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     )
+
+
+@app.route('/api/planilhas/<spreadsheet_id>', methods=['DELETE'])
+def excluir_planilha_salva(spreadsheet_id):
+    if not re.fullmatch(r'[a-f0-9]{32}', spreadsheet_id):
+        return jsonify({'erro': 'Planilha não encontrada.'}), 404
+    try:
+        metadata = next((item for item in _list_spreadsheets() if item['id'] == spreadsheet_id), None)
+        if metadata is None:
+            return jsonify({'erro': 'Planilha não encontrada.'}), 404
+        _delete_spreadsheet(spreadsheet_id)
+        return jsonify({'excluida': True})
+    except Exception as erro:
+        print(f'Erro ao excluir planilha salva {spreadsheet_id}: {erro}')
+        return jsonify({'erro': 'Não foi possível excluir a planilha salva.'}), 500
 
 
 if __name__ == '__main__':
