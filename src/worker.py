@@ -2,9 +2,9 @@ import os
 
 from workers import WorkerEntrypoint, wsgi
 
-from app import app
-import src.app as backend
+import app as backend
 
+app = backend.app
 app.template_folder = os.path.join(os.path.dirname(__file__), "templates")
 
 

@@ -9,6 +9,11 @@
       "python": "${command:python.interpreterPath}",
       "console": "integratedTerminal",
       "cwd": "${workspaceFolder}",
+      "envFile": "${workspaceFolder}/.env",
+      "env": {
+        "NEXUS_ENV": "development",
+        "FLASK_DEBUG": "true"
+      },
       "justMyCode": true
     }
   ]

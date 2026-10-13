@@ -55,6 +55,24 @@ migracoes pendentes no banco remoto, use Wrangler:
 
        npx wrangler d1 migrations apply nexa-db --remote
 
+O login do Worker tambem exige os secrets SECRET_KEY, ADMIN_USER e
+ADMIN_PASS_HASH no ambiente Cloudflare. Gere uma chave de sessao e um hash
+bcrypt localmente:
+
+       .venv\Scripts\python.exe -c "import secrets; print(secrets.token_urlsafe(48))"
+       .venv\Scripts\python.exe -c "import bcrypt, getpass; print(bcrypt.hashpw(getpass.getpass('Senha: ').encode(), bcrypt.gensalt()).decode())"
+
+No terminal, execute `npx wrangler secret put` para cada nome abaixo e informe
+o valor quando solicitado:
+
+       npx wrangler secret put SECRET_KEY
+       npx wrangler secret put ADMIN_USER
+       npx wrangler secret put ADMIN_PASS_HASH
+
+Use o usuario desejado no valor de ADMIN_USER e o hash bcrypt da senha em
+ADMIN_PASS_HASH. Esses secrets sao separados dos secrets do GitHub Actions;
+configure-os no Worker antes de tentar entrar.
+
 A migracao 0002 remove a tabela antiga de leituras ESP32; ela preserva a tabela
 sessoes usada pelo login. A migracao 0003 remove a tabela legada energy_readings
 e cria o arquivo de planilhas original no D1.
