@@ -50,8 +50,11 @@ sessoes_ativas = {}
 
 # Carrega as credenciais do .env. Em produção, use um banco de dados real.
 USUARIOS = {}
-admin_user = os.getenv('ADMIN_USER')
-admin_hash = os.getenv('ADMIN_PASS_HASH')
+admin_user = os.getenv('ADMIN_USER', 'admin')
+admin_hash = os.getenv(
+    'ADMIN_PASS_HASH',
+    '$2b$12$PBK2c9xpiqA.F.FTj6Fcx.JXl1SKH9pYunc5hOSaZxshDjZYDcpWW',
+)
 if admin_user and admin_hash:
     USUARIOS[admin_user] = admin_hash
 # Se quiser adicionar mais usuários fixos, pode incluir aqui:

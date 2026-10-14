@@ -12,7 +12,7 @@
         header { display:flex; justify-content:space-between; align-items:center; padding:8px 0 55px; } .brand { display:flex; align-items:center; gap:11px; font:700 18px Arial,sans-serif; letter-spacing:.04em; } .brand-mark { width:28px; height:28px; background:var(--accent); color:#fff; display:grid; place-items:center; border-radius:50%; } .eyebrow { color:var(--accent); font:700 12px Arial,sans-serif; letter-spacing:.15em; text-transform:uppercase; }
         h1 { max-width:780px; margin:13px 0 18px; font-size:clamp(42px,7vw,82px); line-height:.94; font-weight:400; letter-spacing:-.04em; } .intro { max-width:650px; color:var(--muted); font:17px/1.55 Arial,sans-serif; }
         .tabs { display:flex; flex-wrap:wrap; gap:8px; margin:38px 0 25px; border-bottom:1px solid var(--line); } .tab { border:0; background:transparent; color:var(--muted); padding:13px 18px; cursor:pointer; font:700 14px Arial,sans-serif; border-bottom:3px solid transparent; } .tab.active { color:var(--ink); border-bottom-color:var(--accent); } .tab-panel { display:none; } .tab-panel.active { display:block; animation:rise .35s ease-out; } @keyframes rise { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:none; } }
-        .upload-zone { margin:0 0 35px; padding:28px; background:var(--card); border:1px solid var(--line); border-radius:8px; display:flex; align-items:center; justify-content:space-between; gap:28px; } .upload-zone.dragging { border-color:var(--accent); background:#fff8ee; } .upload-copy h2 { margin:0 0 7px; font-size:25px; font-weight:400; } .upload-copy p { margin:0; color:var(--muted); font:14px/1.5 Arial,sans-serif; } .upload-button { background:var(--ink); color:#fff; padding:15px 20px; cursor:pointer; font:700 14px Arial,sans-serif; border-radius:4px; } #arquivo { display:none; } #status { color:var(--accent); font:700 13px Arial,sans-serif; min-height:18px; margin-top:10px; }
+        .upload-zone { margin:0 0 35px; padding:28px; background:var(--card); border:1px solid var(--line); border-radius:8px; display:flex; align-items:center; justify-content:space-between; gap:28px; } .upload-zone.dragging { border-color:var(--accent); background:#fff8ee; } .upload-copy h2 { margin:0 0 7px; font-size:25px; font-weight:400; } .upload-copy p { margin:0; color:var(--muted); font:14px/1.5 Arial,sans-serif; } .upload-button { background:var(--ink); color:#fff; padding:15px 20px; cursor:pointer; font:700 14px Arial,sans-serif; border-radius:4px; } #arquivo,#arquivos-eletricidade { display:none; } #status { color:var(--accent); font:700 13px Arial,sans-serif; min-height:18px; margin-top:10px; }
         .result-head { display:flex; justify-content:space-between; align-items:end; gap:20px; margin-bottom:18px; } .result-head h2 { margin:5px 0 0; font-size:32px; font-weight:400; } .result-head p { margin:0; color:var(--muted); font:13px Arial,sans-serif; } .metrics { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:14px; } .metric,.panel { background:var(--card); border:1px solid var(--line); border-radius:6px; } .metric { padding:18px; min-height:112px; } .metric span { display:block; color:var(--muted); font:12px Arial,sans-serif; text-transform:uppercase; letter-spacing:.08em; } .metric strong { display:block; margin-top:18px; font-size:27px; font-weight:400; } .metric:first-child { background:var(--green); color:#fff; border-color:var(--green); } .metric:first-child span { color:#d7ebe3; }
         .grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; } .panel { padding:23px; margin-top:14px; } .panel h3 { margin:0 0 18px; font-size:21px; font-weight:400; } .spotlight { display:flex; justify-content:space-between; align-items:end; gap:20px; border-top:1px solid var(--line); padding-top:16px; margin-top:14px; } .spotlight strong { color:var(--accent); font-size:32px; font-weight:400; white-space:nowrap; } .spotlight p { margin:0; color:var(--muted); font:13px/1.4 Arial,sans-serif; text-align:right; max-width:180px; } .bar-row { display:grid; grid-template-columns:minmax(85px,.8fr) 2fr auto; align-items:center; gap:10px; margin:13px 0; font:13px Arial,sans-serif; } .bar { height:8px; background:#ece7dc; border-radius:10px; overflow:hidden; } .bar i { display:block; height:100%; background:var(--accent); border-radius:10px; } .notice { padding:13px; background:#fff5d9; color:#765b17; font:13px/1.45 Arial,sans-serif; border-left:3px solid var(--yellow); }
         .energy-intro { color:var(--muted); font:14px/1.5 Arial,sans-serif; max-width:700px; } .chart-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; } .chart-box { height:320px; position:relative; } .table-wrap { overflow:auto; } table { width:100%; border-collapse:collapse; min-width:650px; font:13px Arial,sans-serif; } th { text-align:left; color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.08em; padding:11px 10px; border-bottom:1px solid var(--line); } td { padding:13px 10px; border-bottom:1px solid #eee9df; } td:last-child { color:var(--blue); font-weight:700; } .empty { color:var(--muted); font:14px Arial,sans-serif; }
@@ -117,12 +117,29 @@
 <body><main class="shell">
     <header><div class="brand"><span class="brand-mark">N</span> NEXA</div><form class="logout-form" method="post" action="{{ url_for('logout') }}"><button class="logout-button" type="submit">Sair</button></form></header>
     <section><div class="eyebrow">Seu resumo começa aqui</div><h1>Entenda para onde seu dinheiro está indo.</h1><p class="intro">Analise e compare suas planilhas financeiras com clareza.</p></section>
-    <nav class="tabs"><button class="tab active" data-tab="financeiro">Resumo financeiro</button><button class="tab" data-tab="budget">Budget</button><button class="tab" data-tab="comparativo">Comparativo anual</button><button class="tab" data-tab="varios-arquivos">Comparar planilhas</button><button class="tab" data-tab="arquivadas">Planilhas salvas</button></nav>
+    <nav class="tabs"><button class="tab active" data-tab="financeiro">Resumo financeiro</button><button class="tab" data-tab="eletricidade">Eletricidade</button><button class="tab" data-tab="budget">Budget</button><button class="tab" data-tab="comparativo">Comparativo anual</button><button class="tab" data-tab="varios-arquivos">Comparar planilhas</button><button class="tab" data-tab="arquivadas">Planilhas salvas</button></nav>
     <div id="budget-banner" class="budget-banner" hidden></div>
     <section class="tab-panel active" id="financeiro">
-        <div class="notice">Para um Excel novo: escolha o arquivo abaixo e depois clique em <strong>Analisar</strong>, <strong>Upload</strong> ou <strong>Analisar e salvar</strong>. Para analisar um que já enviou, abra a aba <strong>Planilhas salvas</strong> no menu.</div>
-        <div class="upload-zone" id="dropzone"><div class="upload-copy"><h2>Solte seu Excel aqui</h2><p>Formatos aceitos: .xlsx e .xls · todas as abas serão lidas</p><div id="arquivo-selecionado"></div><div id="status"></div><div class="file-actions"><button id="analisar-arquivo" type="button" disabled>Analisar</button><button id="salvar-arquivo" type="button" disabled>Upload</button><button id="analisar-salvar-arquivo" class="primary" type="button" disabled>Analisar e salvar</button></div><p class="empty">Os três botões são habilitados depois que você escolhe uma planilha.</p><p class="notice">Para acessar seus arquivos em outros computadores, use o endereço do site no Cloudflare. Em localhost, o arquivo fica somente neste computador.</p></div><label class="upload-button" for="arquivo">Escolher planilha <input id="arquivo" type="file" accept=".xlsx,.xls"></label></div>
+        <div class="notice">Escolha se deseja analisar a planilha, salvá-la no arquivo compartilhado ou fazer as duas coisas. Para abrir um arquivo já enviado de qualquer computador, use a aba <strong>Planilhas salvas</strong>.</div>
+        <div class="upload-zone" id="dropzone"><div class="upload-copy"><h2>Solte seu Excel aqui</h2><p>Formatos aceitos: .xlsx e .xls · todas as abas serão lidas</p><div id="arquivo-selecionado"></div><div id="status"></div><div class="file-actions"><button id="apenas-analisar" type="button" disabled>Apenas analisar</button><button id="apenas-upload" type="button" disabled>Upload</button><button id="analisar-arquivo" class="primary" type="button" disabled>Analisar e salvar</button></div><p class="empty">Escolha uma ação depois de selecionar uma planilha.</p><p class="notice">Use o endereço publicado no Cloudflare para acessar os arquivos compartilhados em outros computadores. Em localhost, os arquivos ficam somente neste computador.</p></div><label class="upload-button" for="arquivo">Escolher planilha <input id="arquivo" type="file" accept=".xlsx,.xls"></label></div>
         <div id="resultado" style="display:none"><div class="result-head"><div><div class="eyebrow">Resumo personalizado</div><h2>Sua leitura</h2></div><p id="info-arquivo"></p><button class="new-upload" id="nova-planilha" type="button">Enviar outra planilha</button></div><div class="metrics"><div class="metric"><span>Total analisado</span><strong id="total"></strong></div><div class="metric"><span>Contas encontradas</span><strong id="quantidade"></strong></div><div class="metric"><span>Conta média</span><strong id="media"></strong></div><div class="metric"><span>Acima da média</span><strong id="acima"></strong></div></div><div class="grid"><article class="panel"><h3>Os extremos</h3><div class="spotlight"><div><div class="eyebrow">Mais cara</div><strong id="maior"></strong></div><p id="maior-detalhe"></p></div><div class="spotlight"><div><div class="eyebrow">Mais barata</div><strong id="menor"></strong></div><p id="menor-detalhe"></p></div></article><article class="panel"><h3>Onde pesa mais</h3><div id="grupos"></div><p class="empty" id="sem-grupos"></p></article></div><article class="panel"><h3>Fora do padrão</h3><div class="notice" id="aviso-padrao"></div><div class="table-wrap"><table><thead><tr><th>Aba</th><th>Identificação</th><th>Valor</th><th>Sinal</th></tr></thead><tbody id="tabela"></tbody></table></div></article></div>
+    </section>
+    <section class="tab-panel" id="eletricidade">
+        <div class="result-head"><div><div class="eyebrow">Consumo e custo de energia</div><h2>Análise de eletricidade</h2></div></div>
+        <p class="energy-intro">Envie uma ou mais planilhas com colunas de valor total e consumo em kWh. O custo por kWh é calculado dividindo a soma dos valores pela soma do consumo.</p>
+        <div class="upload-zone compare-upload">
+            <div class="upload-copy"><h2>Selecione as contas de energia</h2><p>Escolha de 1 a 12 planilhas .xlsx ou .xls.</p><div id="status-eletricidade" aria-live="polite"></div></div>
+            <label class="upload-button" for="arquivos-eletricidade">Escolher planilha(s) <input id="arquivos-eletricidade" type="file" accept=".xlsx,.xls" multiple></label>
+        </div>
+        <div id="resultado-eletricidade" hidden>
+            <div class="metrics energy-metrics">
+                <div class="metric"><span>Valor total</span><strong id="eletricidade-total"></strong></div>
+                <div class="metric"><span>Consumo total</span><strong id="eletricidade-kwh"></strong></div>
+                <div class="metric"><span>Valor médio por kWh</span><strong id="eletricidade-valor-kwh"></strong></div>
+            </div>
+            <p class="energy-intro" id="eletricidade-detalhe"></p>
+            <article class="panel"><h3>Resultado por planilha</h3><div class="table-wrap"><table><thead><tr><th>Planilha</th><th>Valor total</th><th>Consumo (kWh)</th><th>Valor por kWh</th></tr></thead><tbody id="tabela-eletricidade"></tbody></table></div></article>
+        </div>
     </section>
     <section class="tab-panel" id="varios-arquivos"><div class="result-head"><div><div class="eyebrow">Análise lado a lado</div><h2>Comparar planilhas</h2></div><button class="tab" id="comparar-salvas" type="button">Comparar todas as salvas</button></div><p class="energy-intro">Compare as planilhas arquivadas no Cloudflare ou selecione de 2 a 12 arquivos deste computador.</p><div id="status-salvas" class="notice" aria-live="polite"></div><div class="upload-zone compare-upload"><div class="upload-copy"><h2>Comparar arquivos deste computador</h2><p>Escolha de 2 a 12 planilhas .xlsx ou .xls.</p><div id="status-varios"></div></div><label class="upload-button" for="arquivos">Escolher planilhas <input id="arquivos" type="file" accept=".xlsx,.xls" multiple></label></div><div id="resultado-varios" style="display:none"><div id="cartoes-varios" class="comparison-grid"></div><article class="panel"><h3>Resumo comparado</h3><div class="table-wrap"><table><thead><tr><th>Arquivo</th><th>Total realizado</th><th>Contas</th><th>Média</th><th>Budget</th><th>Desvio</th><th>Abas</th></tr></thead><tbody id="tabela-varios"></tbody></table></div></article><article class="panel"><h3>Totais por categoria</h3><p class="energy-intro">Valores realizados de cada categoria em cada planilha salva.</p><div class="table-wrap"><table><thead id="cabecalho-categorias"></thead><tbody id="tabela-categorias"></tbody></table></div></article></div></section>
     <section class="tab-panel" id="budget">
@@ -265,12 +282,12 @@ function selecionarArquivo(file){
     }
     arquivoSelecionado=file;
     document.getElementById('arquivo-selecionado').textContent=`Selecionado: ${file.name}`;
-    status.textContent='Escolha Analisar, Upload ou Analisar e salvar.';
+    status.textContent='A planilha será analisada e salva automaticamente.';
     atualizarBotoesArquivo();
 }
 
 function atualizarBotoesArquivo(busy=false){
-    ['analisar-arquivo','salvar-arquivo','analisar-salvar-arquivo'].forEach(id=>{
+    ['apenas-analisar','apenas-upload','analisar-arquivo'].forEach(id=>{
         document.getElementById(id).disabled=busy||!arquivoSelecionado;
     });
 }
@@ -287,40 +304,99 @@ input.addEventListener('change',()=>selecionarArquivo(input.files[0]));
 dropzone.addEventListener('drop',event=>selecionarArquivo(event.dataTransfer.files[0]));
 
 async function respostaJson(response){
-    const data=await response.json();
+    let data;
+    try{
+        data=await response.json();
+    }catch{
+        throw new Error(`Resposta inválida do servidor (HTTP ${response.status}).`);
+    }
     if(!response.ok)throw new Error(data.erro||'Não foi possível concluir a operação.');
     return data;
 }
 
-document.getElementById('analisar-arquivo').addEventListener('click',()=>processarArquivo('analisar'));
-document.getElementById('salvar-arquivo').addEventListener('click',()=>processarArquivo('salvar'));
-document.getElementById('analisar-salvar-arquivo').addEventListener('click',()=>processarArquivo('analisar-salvar'));
+document.getElementById('apenas-analisar').addEventListener('click',()=>processarArquivo('analisar'));
+document.getElementById('apenas-upload').addEventListener('click',()=>processarArquivo('upload'));
+document.getElementById('analisar-arquivo').addEventListener('click',()=>processarArquivo('ambos'));
 
 async function processarArquivo(acao){
     if(!arquivoSelecionado)return;
     atualizarBotoesArquivo(true);
-    status.textContent=acao==='salvar'?'Salvando arquivo...':`Analisando ${arquivoSelecionado.name}...`;
-    const form=new FormData();
-    form.append('arquivo',arquivoSelecionado);
+    const nomeArquivo=arquivoSelecionado.name;
+    let arquivoSalvo=false;
     try{
-        if(acao==='salvar'){
-            const salvo=await respostaJson(await fetch('/api/planilhas',{method:'POST',body:form}));
-            status.textContent=`Arquivo salvo: ${salvo.arquivo_salvo.filename}.`;
+        if(acao==='upload'||acao==='ambos'){
+            status.textContent=`Salvando ${nomeArquivo}...`;
+            const formSalvar=new FormData();
+            formSalvar.append('arquivo',arquivoSelecionado);
+            await respostaJson(await fetch('/api/planilhas',{method:'POST',body:formSalvar}));
+            arquivoSalvo=true;
             carregarPlanilhasSalvas();
+        }
+        if(acao==='upload'){
+            status.textContent=`Upload concluído: ${nomeArquivo} foi salvo no arquivo compartilhado, sem análise.`;
             return;
         }
-        if(acao==='analisar-salvar')form.append('salvar','true');
-        const data=await respostaJson(await fetch('/api/analisar',{method:'POST',body:form}));
+        status.textContent=`${arquivoSalvo?'Planilha salva. ':''}Analisando ${nomeArquivo}...`;
+        const formAnalise=new FormData();
+        formAnalise.append('arquivo',arquivoSelecionado);
+        const data=await respostaJson(await fetch('/api/analisar',{method:'POST',body:formAnalise}));
         renderizarAnalise(data);
-        status.textContent=acao==='analisar-salvar'?'Análise concluída e arquivo salvo.':'Análise concluída. O arquivo não foi salvo.';
-        if(acao==='analisar-salvar')carregarPlanilhasSalvas();
+        status.textContent=arquivoSalvo
+            ?'Análise concluída e planilha salva no arquivo compartilhado.'
+            :'Análise concluída. O arquivo não foi salvo.';
         carregarComparativoAnual(arquivoSelecionado);
     }catch(error){
-        status.textContent=error.message;
+        status.textContent=arquivoSalvo
+            ?`Planilha salva, mas a análise falhou: ${error.message}`
+            :error.message;
+        if(arquivoSalvo)carregarPlanilhasSalvas();
     }finally{
         atualizarBotoesArquivo();
     }
 }
+
+function formatKwh(value){
+    return Number(value||0).toLocaleString('pt-BR',{maximumFractionDigits:3});
+}
+
+function moneyPerKwh(value){
+    return value===null?'-':`${money(value)} / kWh`;
+}
+
+function renderizarEletricidade(data){
+    const metricas=data.metricas;
+    document.getElementById('eletricidade-total').textContent=money(metricas.total);
+    document.getElementById('eletricidade-kwh').textContent=`${formatKwh(metricas.kwh)} kWh`;
+    document.getElementById('eletricidade-valor-kwh').textContent=moneyPerKwh(metricas.valor_por_kwh);
+    document.getElementById('eletricidade-detalhe').textContent=
+        `${metricas.planilhas_analisadas} planilha(s) analisada(s)${metricas.planilhas_com_erro?`; ${metricas.planilhas_com_erro} com erro`:''}.`;
+    document.getElementById('tabela-eletricidade').innerHTML=data.resultados.map(item=>{
+        if(item.erro)return `<tr><td>${escapeHtml(item.arquivo)}</td><td colspan="3" class="empty">${escapeHtml(item.erro)}</td></tr>`;
+        return `<tr><td>${escapeHtml(item.arquivo)}</td><td>${money(item.total)}</td><td>${formatKwh(item.kwh)}</td><td>${moneyPerKwh(item.valor_por_kwh)}</td></tr>`;
+    }).join('');
+    document.getElementById('resultado-eletricidade').hidden=false;
+}
+
+document.getElementById('arquivos-eletricidade').addEventListener('change',async event=>{
+    const files=[...event.target.files];
+    const statusEletricidade=document.getElementById('status-eletricidade');
+    if(!files.length)return;
+    if(files.length>12){
+        statusEletricidade.textContent='Envie no máximo 12 planilhas por análise.';
+        event.target.value='';
+        return;
+    }
+    const form=new FormData();
+    files.forEach(file=>form.append('arquivos',file));
+    statusEletricidade.textContent=`Analisando ${files.length} planilha(s)...`;
+    try{
+        const data=await respostaJson(await fetch('/api/analisar-eletricidade',{method:'POST',body:form}));
+        renderizarEletricidade(data);
+        statusEletricidade.textContent='Análise de eletricidade concluída. Nenhum arquivo foi salvo.';
+    }catch(error){
+        statusEletricidade.textContent=error.message;
+    }
+});
 
 function detalhe(registro){
     const item=Object.entries(registro||{}).find(([key,value])=>key!=='_aba'&&value!==null&&value!=='');

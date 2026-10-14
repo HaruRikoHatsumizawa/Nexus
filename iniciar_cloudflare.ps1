@@ -3,7 +3,7 @@ $python = Join-Path $PSScriptRoot '.venv\Scripts\python.exe'
 $logs = Join-Path $PSScriptRoot 'logs'
 
 if (-not (Test-Path $python)) {
-    throw 'Ambiente virtual ausente. Execute .venv\Scripts\python.exe -m pip install -r requirements.txt'
+    throw 'Ambiente virtual ausente. Execute .venv\Scripts\python.exe -m pip install -r requirements-local.txt'
 }
 if (-not (Test-Path (Join-Path $PSScriptRoot '.env'))) {
     throw 'Arquivo .env ausente. Configure-o copiando e preenchendo .env.example.'
